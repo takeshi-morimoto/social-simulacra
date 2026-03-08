@@ -9,7 +9,9 @@
       "Bash(npx next:*)",
       "Bash(gh repo:*)",
       "Bash(npm run:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx vercel:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -25,3 +25,28 @@ export interface AnalysisResponse {
 }
 
 export type StanceCounts = Record<Stance, number>;
+
+export interface ChartSegment {
+  name: string;
+  value: number;
+}
+
+export interface DemographicProfile {
+  population: string;
+  aging_rate: string;
+  main_industries: string[];
+  foreign_rate: string;
+  household_features: string;
+  rationale: string;
+  age_distribution: ChartSegment[];
+  gender_distribution: ChartSegment[];
+  industry_distribution: ChartSegment[];
+}
+
+export interface PolicyProposal {
+  title: string;
+  description: string;
+  reason: string;
+}
+
+export type ProposalResults = Record<number, PolicyProposal>;
