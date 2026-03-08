@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>市民シミュレーター｜Social Simulacra × 行政DX</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+    padding: 32px 20px;
+    color: white;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fade-in { animation: fadeIn 0.5s ease forwards; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #ffffff30; border-radius: 3px; }
+
+  .container { max-width: 960px; margin: 0 auto; }
+
+  /* API Key Section */
+  .apikey-section {
+    background: rgba(255,200,100,0.08);
+    border: 1px solid rgba(255,200,100,0.25);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .apikey-label { font-size: 13px; color: #f0c060; font-weight: 700; white-space: nowrap; }
+  .apikey-input {
+    flex: 1;
+    min-width: 200px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,200,100,0.3);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: white;
+    font-size: 13px;
+    outline: none;
+    font-family: monospace;
+    letter-spacing: 1px;
+  }
+  .apikey-input::placeholder { color: #666; letter-spacing: 0; font-family: inherit; }
+  .apikey-note { font-size: 11px; color: #888; width: 100%; }
+  .apikey-note a { color: #aaa; }
+
+  /* Header */
+  .badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 12px;
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: clamp(24px, 4vw, 38px);
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    margin-bottom: 12px;
+  }
+  .subtitle { color: #aaa; font-size: 14px; }
+
+  /* Input Area */
+  .input-section {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 28px;
+  }
+  .section-label { color: white; font-weight: 700; margin-bottom: 12px; font-size: 14px; }
+  textarea {
+    width: 100%;
+    min-height: 80px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    padding: 14px;
+    color: white;
+    font-size: 14px;
+    line-height: 1.6;
+    outline: none;
+    resize: vertical;
+    font-family: inherit;
+  }
+  textarea::placeholder { color: #555; }
+  .sample-label { color: #888; font-size: 11px; margin-bottom: 8px; margin-top: 12px; }
+  .sample-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sample-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 5px 14px;
+    color: #ccc;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .sample-btn:hover { background: rgba(255,255,255,0.18); }
+
+  .run-btn {
+    margin-top: 18px;
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 1px;
+    font-family: inherit;
+  }
+  .run-btn:disabled {
+    background: rgba(255,255,255,0.1);
+    color: #555;
+    cursor: not-allowed;
+  }
+  .run-btn:not(:disabled):hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* Stance counter */
+  .stance-bar {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .stance-label-main { color: #aaa; font-size: 12px; font-weight: 700; }
+  .stance-item { display: flex; align-items: center; gap: 6px; }
+  .stance-count { font-weight: 700; font-size: 20px; }
+  .stance-name { color: #666; font-size: 12px; }
+
+  /* Persona Grid */
+  .persona-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  /* Persona Card */
+  .persona-card {
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    min-height: 180px;
+  }
+  .persona-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .persona-avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .persona-name { font-weight: 700; font-size: 14px; color: #1a1a2e; }
+  .persona-meta { font-size: 11px; color: #666; margin-top: 2px; }
+  .persona-badge {
+    margin-left: auto;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .loading-dots { display: flex; align-items: center; gap: 8px; color: #999; font-size: 13px; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .dot:nth-child(1) { animation: pulse 1s infinite; }
+  .dot:nth-child(2) { animation: pulse 1s infinite 0.2s; }
+  .dot:nth-child(3) { animation: pulse 1s infinite 0.4s; }
+  .opinion-box {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #333;
+  }
+  .tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .tag {
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .stance-row { margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+  .stance-row-label { font-size: 11px; color: #888; }
+  .stance-value { font-size: 12px; font-weight: 700; }
+  .persona-desc { font-size: 12px; color: #bbb; font-style: italic; }
+
+  /* Analysis */
+  .analysis-section {
+    background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+    border: 1px solid rgba(102,126,234,0.4);
+    border-radius: 20px;
+    padding: 28px;
+  }
+  .analysis-title { font-weight: 800; font-size: 16px; margin-bottom: 20px; }
+  .approval-label { color: #ccc; font-size: 12px; margin-bottom: 8px; }
+  .approval-bar-bg {
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px; height: 12px; overflow: hidden;
+  }
+  .approval-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2ECC71, #27AE60);
+    border-radius: 8px;
+    transition: width 1s ease;
+  }
+  .approval-pct { color: #2ECC71; font-weight: 700; margin-top: 6px; }
+  .overall-box {
+    color: white; font-size: 14px; line-height: 1.7;
+    background: rgba(255,255,255,0.05); border-radius: 10px; padding: 14px;
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 500px) { .two-col { grid-template-columns: 1fr; } }
+  .risk-item {
+    background: rgba(231,76,60,0.1);
+    border: 1px solid rgba(231,76,60,0.3);
+    border-radius: 8px; padding: 8px 12px;
+    color: #ffaaaa; font-size: 12px; margin-bottom: 6px;
+  }
+  .rec-item {
+    background: rgba(46,204,113,0.1);
+    border: 1px solid rgba(46,204,113,0.3);
+    border-radius: 8px; padding: 8px 12px;
+    color: #aaffcc; font-size: 12px; margin-bottom: 6px;
+  }
+  .footer { text-align: center; color: #444; font-size: 11px; margin-top: 32px; }
+  .hidden { display: none !important; }
+  .analysis-gap { display: grid; gap: 20px; }
+  .col-header { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div style="text-align:center; margin-bottom:40px">
+    <div class="badge">SOCIAL SIMULACRA × 行政DX</div>
+    <h1>市民シミュレーター</h1>
+    <p class="subtitle">政策を入力すると、6種類の市民ペルソナがAIとして反応します</p>
+  </div>
+
+  <!-- API Key -->
+  <div class="apikey-section">
+    <span class="apikey-label">🔑 Anthropic APIキー</span>
+    <input type="password" id="apiKey" class="apikey-input" placeholder="sk-ant-..." />
+    <p class="apikey-note">
+      APIキーは画面上で処理されるのみで、どこにも送信・保存されません。
+      キーは <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a> で取得できます。
+    </p>
+  </div>
+
+  <!-- Input -->
+  <div class="input-section">
+    <div class="section-label">📋 政策・施策を入力</div>
+    <textarea id="policyInput" placeholder="例：来年4月から住民票の窓口申請を廃止し、マイナンバーカードとスマートフォンアプリのみに移行します"></textarea>
+    <div class="sample-label">💡 サンプル政策：</div>
+    <div class="sample-buttons">
+      <button class="sample-btn" onclick="setSample(0)">例1：窓口廃止・アプリ移行</button>
+      <button class="sample-btn" onclick="setSample(1)">例2：公共施設予約オンライン化</button>
+      <button class="sample-btn" onclick="setSample(2)">例3：生活保護AIチャットボット</button>
+    </div>
+    <button class="run-btn" id="runBtn" onclick="runSimulation()">🚀 市民シミュレーションを実行</button>
+  </div>
+
+  <!-- Stance Bar -->
+  <div class="stance-bar hidden" id="stanceBar">
+    <span class="stance-label-main">市民の反応：</span>
+    <div class="stance-item"><span style="font-size:14px">✅</span><span class="stance-count" id="cnt-賛成" style="color:#2ECC71">0</span><span class="stance-name">賛成</span></div>
+    <div class="stance-item"><span style="font-size:14px">⚠️</span><span class="stance-count" id="cnt-条件" style="color:#F39C12">0</span><span class="stance-name">条件付き賛成</span></div>
+    <div class="stance-item"><span style="font-size:14px">❌</span><span class="stance-count" id="cnt-反対" style="color:#E74C3C">0</span><span class="stance-name">反対</span></div>
+    <div class="stance-item"><span style="font-size:14px">➖</span><span class="stance-count" id="cnt-中立" style="color:#888">0</span><span class="stance-name">中立</span></div>
+  </div>
+
+  <!-- Persona Grid -->
+  <div class="persona-grid" id="personaGrid"></div>
+
+  <!-- Analysis -->
+  <div class="analysis-section hidden" id="analysisSection">
+    <div class="analysis-title">📊 政策アナリシスレポート</div>
+    <div class="analysis-gap" id="analysisContent">
+      <div style="color:#aaa; font-size:13px" id="analysisLoading">レポート生成中...</div>
+    </div>
+  </div>
+
+  <div class="footer">Social Simulacra × 行政DX デモ — Powered by Claude API</div>
+</div>
+
+<script>
+const SAMPLES = [
+  "来年4月から住民票・印鑑証明などの窓口申請を廃止し、マイナンバーカードとスマートフォンアプリのみに移行します",
+  "区内の公共施設予約をすべてオンライン化し、電話・窓口での予約は廃止します",
+  "生活保護の申請手続きをAIチャットボットで完結できるよう変更します",
+];
+
+const PERSONAS = [
+  { id:1, name:"田中 節子", age:72, role:"年金生活者", icon:"👵", color:"#E8A87C", bg:"#FDF3EA", detail:"豊島区在住30年。デジタル機器が苦手で、役所の窓口に頼ることが多い。" },
+  { id:2, name:"李 ウェイ", age:34, role:"外国人住民（中国）", icon:"🧑‍💼", color:"#7EC8A8", bg:"#EAF7F1", detail:"池袋在住4年。日本語は中級レベル。IT系企業勤務。" },
+  { id:3, name:"鈴木 健太", age:42, role:"子育て世代・会社員", icon:"👨‍👩‍👧", color:"#7BA7D4", bg:"#EAF1FA", detail:"妻と子供2人。平日は仕事で忙しく、行政手続きの時間が取れない。" },
+  { id:4, name:"佐藤 美咲", age:28, role:"フリーランス・デジタルネイティブ", icon:"👩‍💻", color:"#B07ED4", bg:"#F3EAF9", detail:"SNSやアプリを積極活用。行政DXには賛成だが使いやすさにうるさい。" },
+  { id:5, name:"山本 隆", age:58, role:"中小企業経営者", icon:"🧑‍🔧", color:"#D4A87E", bg:"#FAF1EA", detail:"従業員10名の製造業。行政手続きの煩雑さに毎年悩んでいる。" },
+  { id:6, name:"中村 あおい", age:19, role:"大学生", icon:"🎓", color:"#E07EA0", bg:"#FAE9F1", detail:"豊島区出身。住民票の手続きなどを初めて自分でやり始めた世代。" },
+];
+
+function setSample(i) {
+  document.getElementById('policyInput').value = SAMPLES[i];
+}
+
+function renderPersonaCards() {
+  const grid = document.getElementById('personaGrid');
+  grid.innerHTML = '';
+  PERSONAS.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'persona-card';
+    card.id = `card-${p.id}`;
+    card.style.background = p.bg;
+    card.style.border = `1.5px solid ${p.color}40`;
+    card.innerHTML = `
+      <div class="persona-header">
+        <div class="persona-avatar" style="background:${p.color}30; border:2px solid ${p.color}">${p.icon}</div>
+        <div>
+          <div class="persona-name">${p.name}</div>
+          <div class="persona-meta">${p.age}歳 · ${p.role}</div>
+        </div>
+        <div class="persona-badge" style="background:${p.color}20; color:${p.color}; border:1px solid ${p.color}60">市民ペルソナ</div>
+      </div>
+      <div class="persona-desc">${p.detail}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function setCardLoading(persona) {
+  const card = document.getElementById(`card-${persona.id}`);
+  card.innerHTML = `
+    <div class="persona-header">
+      <div class="persona-avatar" style="background:${persona.color}30; border:2px solid ${persona.color}">${persona.icon}</div>
+      <div>
+        <div class="persona-name">${persona.name}</div>
+        <div class="persona-meta">${persona.age}歳 · ${persona.role}</div>
+      </div>
+      <div class="persona-badge" style="background:${persona.color}20; color:${persona.color}; border:1px solid ${persona.color}60">市民ペルソナ</div>
+    </div>
+    <div class="loading-dots">
+      <div class="dot" style="background:${persona.color}"></div>
+      <div class="dot" style="background:${persona.color}"></div>
+      <div class="dot" style="background:${persona.color}"></div>
+      <span>考え中...</span>
+    </div>
+  `;
+}
+
+function setCardResponse(persona, response) {
+  const card = document.getElementById(`card-${persona.id}`);
+  const stanceColor = response.stance === '賛成' ? '#2ECC71' : response.stance === '反対' ? '#E74C3C' : response.stance === '条件付き賛成' ? '#F39C12' : '#888';
+  const stanceIcon = response.stance === '賛成' ? '✅' : response.stance === '反対' ? '❌' : '⚠️';
+  const tagsHtml = (response.tags || []).map(t =>
+    `<span class="tag" style="background:${persona.color}20; color:${persona.color}; border:1px solid ${persona.color}50">#${t}</span>`
+  ).join('');
+  card.className = 'persona-card fade-in';
+  card.innerHTML = `
+    <div class="persona-header">
+      <div class="persona-avatar" style="background:${persona.color}30; border:2px solid ${persona.color}">${persona.icon}</div>
+      <div>
+        <div class="persona-name">${persona.name}</div>
+        <div class="persona-meta">${persona.age}歳 · ${persona.role}</div>
+      </div>
+      <div class="persona-badge" style="background:${persona.color}20; color:${persona.color}; border:1px solid ${persona.color}60">市民ペルソナ</div>
+    </div>
+    <div class="opinion-box" style="border-left:3px solid ${persona.color}">${response.opinion}</div>
+    <div class="tags">${tagsHtml}</div>
+    <div class="stance-row">
+      <span class="stance-row-label">この政策への態度：</span>
+      <span class="stance-value" style="color:${stanceColor}">${stanceIcon} ${response.stance}</span>
+    </div>
+  `;
+  updateStanceCount(response.stance);
+}
+
+const stanceCounts = { '賛成': 0, '条件付き賛成': 0, '反対': 0, '中立': 0 };
+function updateStanceCount(stance) {
+  document.getElementById('stanceBar').classList.remove('hidden');
+  if (stance === '賛成') { stanceCounts['賛成']++; document.getElementById('cnt-賛成').textContent = stanceCounts['賛成']; }
+  else if (stance === '条件付き賛成') { stanceCounts['条件付き賛成']++; document.getElementById('cnt-条件').textContent = stanceCounts['条件付き賛成']; }
+  else if (stance === '反対') { stanceCounts['反対']++; document.getElementById('cnt-反対').textContent = stanceCounts['反対']; }
+  else { stanceCounts['中立']++; document.getElementById('cnt-中立').textContent = stanceCounts['中立']; }
+}
+
+async function callAPI(apiKey, systemPrompt, userMessage) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+      'x-api-key': apiKey,
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API Error ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  const text = data.content?.[0]?.text || '{}';
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+async function fetchPersona(apiKey, persona, policy) {
+  const systemPrompt = `あなたは以下の市民ペルソナです。このペルソナとして、提示された行政の政策に対して率直に意見を述べてください。
+
+ペルソナ情報：
+- 名前: ${persona.name}
+- 年齢: ${persona.age}歳
+- 立場: ${persona.role}
+- 背景: ${persona.detail}
+
+必ずJSON形式のみで回答してください。余計なテキスト・マークダウン不要：
+{"opinion":"この政策についての率直な意見（2〜4文、このペルソナらしい言葉遣いで）","stance":"賛成 または 反対 または 条件付き賛成 または 中立 のいずれか一つ","tags":["懸念点や関心事を表す2〜3個のキーワード（5文字以内）"]}`;
+  for (let i = 0; i <= 2; i++) {
+    try {
+      return await callAPI(apiKey, systemPrompt, `政策：${policy}`);
+    } catch (e) {
+      if (i < 2) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+      else return { opinion: '（通信エラーのため回答を取得できませんでした）', stance: '中立', tags: ['エラー'] };
+    }
+  }
+}
+
+async function fetchSummary(apiKey, policy, allResponses) {
+  const summary = PERSONAS.map(p => {
+    const r = allResponses[p.id];
+    return `${p.name}(${p.role}): ${r?.stance} - ${r?.opinion}`;
+  }).join('\n');
+  const systemPrompt = `あなたは行政政策のアナリストです。複数の市民の意見を分析して、政策立案者向けのレポートをJSON形式のみで出力してください：{"overall":"全体的な市民の反応の要約（2文）","risks":["主なリスク・懸念事項3つ（各20文字以内）"],"recommendations":["政策改善への提言2つ（各30文字以内）"],"approval_rate":賛成・条件付き賛成の割合（0〜100の整数）}`;
+  try {
+    return await callAPI(apiKey, systemPrompt, `政策：${policy}\n\n市民の反応：\n${summary}`);
+  } catch (e) {
+    return null;
+  }
+}
+
+function renderAnalysis(data) {
+  if (!data) return;
+  const section = document.getElementById('analysisSection');
+  const content = document.getElementById('analysisContent');
+  content.innerHTML = `
+    <div>
+      <div class="approval-label">推定支持率</div>
+      <div class="approval-bar-bg"><div class="approval-bar-fill" style="width:${data.approval_rate}%"></div></div>
+      <div class="approval-pct">${data.approval_rate}%</div>
+    </div>
+    <div>
+      <div class="approval-label">総合評価</div>
+      <div class="overall-box">${data.overall}</div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="col-header" style="color:#E74C3C">⚠️ 主なリスク</div>
+        ${(data.risks||[]).map(r=>`<div class="risk-item">${r}</div>`).join('')}
+      </div>
+      <div>
+        <div class="col-header" style="color:#2ECC71">💡 改善提言</div>
+        ${(data.recommendations||[]).map(r=>`<div class="rec-item">${r}</div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function runSimulation() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const policy = document.getElementById('policyInput').value.trim();
+  if (!apiKey) { alert('Anthropic APIキーを入力してください'); return; }
+  if (!policy) { alert('政策を入力してください'); return; }
+
+  // Reset
+  Object.keys(stanceCounts).forEach(k => stanceCounts[k] = 0);
+  ['cnt-賛成','cnt-条件','cnt-反対','cnt-中立'].forEach(id => document.getElementById(id).textContent = '0');
+  document.getElementById('stanceBar').classList.add('hidden');
+  document.getElementById('analysisSection').classList.add('hidden');
+  document.getElementById('analysisContent').innerHTML = '<div style="color:#aaa;font-size:13px" id="analysisLoading">レポート生成中...</div>';
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ シミュレーション実行中...';
+
+  renderPersonaCards();
+
+  const allResponses = {};
+  for (const persona of PERSONAS) {
+    setCardLoading(persona);
+    const result = await fetchPersona(apiKey, persona, policy);
+    allResponses[persona.id] = result;
+    setCardResponse(persona, result);
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  document.getElementById('analysisSection').classList.remove('hidden');
+  document.getElementById('analysisSection').classList.add('fade-in');
+  const summary = await fetchSummary(apiKey, policy, allResponses);
+  renderAnalysis(summary);
+
+  btn.disabled = false;
+  btn.textContent = '🚀 市民シミュレーションを実行';
+}
+
+renderPersonaCards();
+</script>
+</body>
+</html>
