@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { PERSONAS } from "@/lib/constants";
-import type { PersonaResponse, AnalysisResponse, StanceCounts, Stance } from "@/lib/types";
+import type { Persona, PersonaResponse, AnalysisResponse, StanceCounts, Stance } from "@/lib/types";
+import MunicipalityInput from "@/components/MunicipalityInput";
 import PolicyInput from "@/components/PolicyInput";
 import StanceBar from "@/components/StanceBar";
 import PersonaCard from "@/components/PersonaCard";
@@ -11,6 +11,9 @@ import AnalysisReport from "@/components/AnalysisReport";
 const INITIAL_COUNTS: StanceCounts = { "賛成": 0, "条件付き賛成": 0, "反対": 0, "中立": 0 };
 
 export default function Home() {
+  const [municipality, setMunicipality] = useState("");
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [isGeneratingPersonas, setIsGeneratingPersonas] = useState(false);
   const [policy, setPolicy] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [personaResults, setPersonaResults] = useState<Record<number, PersonaResponse | null>>({});
@@ -21,66 +24,90 @@ export default function Home() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
 
+  const generatePersonas = useCallback(async () => {
+    const muni = municipality.trim();
+    if (!muni) return;
+
+    setIsGeneratingPersonas(true);
+    setPersonas([]);
+    setPersonaResults({});
+    setStanceCounts({ ...INITIAL_COUNTS });
+    setShowStanceBar(false);
+    setAnalysis(null);
+    setShowAnalysis(false);
+
+    try {
+      const res = await fetch("/api/generate-personas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ municipality: muni }),
+      });
+      if (res.ok) {
+        const data: Persona[] = await res.json();
+        setPersonas(data);
+      } else {
+        alert("ペルソナの生成に失敗しました");
+      }
+    } catch {
+      alert("ペルソナの生成に失敗しました");
+    }
+
+    setIsGeneratingPersonas(false);
+  }, [municipality]);
+
   const runSimulation = useCallback(async () => {
     const pol = policy.trim();
     if (!pol) { alert("政策を入力してください"); return; }
+    if (!personas.length) { alert("先に自治体を選択してペルソナを生成してください"); return; }
 
-    // Reset
     setIsRunning(true);
     setPersonaResults({});
     setStanceCounts({ ...INITIAL_COUNTS });
     setShowStanceBar(false);
     setAnalysis(null);
     setShowAnalysis(false);
-    setLoadingPersonas(new Set(PERSONAS.map((p) => p.id)));
+    setLoadingPersonas(new Set(personas.map((p) => p.id)));
 
-    // Fetch all personas in parallel
     const results: Record<number, PersonaResponse> = {};
 
-    await Promise.all(
-      PERSONAS.map(async (persona) => {
-        try {
-          const res = await fetch("/api/persona", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona, policy: pol }),
-          });
-          const data: PersonaResponse = await res.json();
-          results[persona.id] = data;
+    try {
+      const res = await fetch("/api/personas-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ policy: pol, personas }),
+      });
+      const data: Record<string, PersonaResponse> = await res.json();
 
-          setPersonaResults((prev) => ({ ...prev, [persona.id]: data }));
-          setLoadingPersonas((prev) => {
-            const next = new Set(prev);
-            next.delete(persona.id);
-            return next;
-          });
+      for (const persona of personas) {
+        const r = data[String(persona.id)];
+        if (r) {
+          results[persona.id] = r;
+          setPersonaResults((prev) => ({ ...prev, [persona.id]: r }));
           setStanceCounts((prev) => ({
             ...prev,
-            [data.stance]: prev[data.stance as Stance] + 1,
+            [r.stance]: prev[r.stance as Stance] + 1,
           }));
-          setShowStanceBar(true);
-        } catch {
-          const fallback: PersonaResponse = {
-            opinion: "（通信エラーのため回答を取得できませんでした）",
-            stance: "中立",
-            tags: ["エラー"],
-          };
-          results[persona.id] = fallback;
-          setPersonaResults((prev) => ({ ...prev, [persona.id]: fallback }));
-          setLoadingPersonas((prev) => {
-            const next = new Set(prev);
-            next.delete(persona.id);
-            return next;
-          });
         }
-      }),
-    );
+      }
+    } catch {
+      for (const persona of personas) {
+        const fallback: PersonaResponse = {
+          opinion: "（通信エラーのため回答を取得できませんでした）",
+          stance: "中立",
+          tags: ["エラー"],
+        };
+        results[persona.id] = fallback;
+        setPersonaResults((prev) => ({ ...prev, [persona.id]: fallback }));
+      }
+    }
 
-    // Fetch summary
+    setLoadingPersonas(new Set());
+    setShowStanceBar(true);
+
     setShowAnalysis(true);
     setAnalysisLoading(true);
 
-    const responseSummary = PERSONAS.map((p) => {
+    const responseSummary = personas.map((p) => {
       const r = results[p.id];
       return `${p.name}(${p.role}): ${r?.stance} - ${r?.opinion}`;
     }).join("\n");
@@ -100,43 +127,59 @@ export default function Home() {
 
     setAnalysisLoading(false);
     setIsRunning(false);
-  }, [policy]);
+  }, [policy, personas]);
 
   return (
-    <div className="mx-auto max-w-[960px]">
+    <div className="mx-auto max-w-[960px] px-5 py-8">
       {/* Header */}
-      <div className="mb-10 text-center">
-        <span className="mb-4 inline-block rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 px-4 py-1.5 text-[11px] font-bold tracking-widest">
-          SOCIAL SIMULACRA × 行政DX
-        </span>
-        <h1 className="mb-3 text-[clamp(24px,4vw,38px)] font-black tracking-tight">
-          市民シミュレーター
-        </h1>
-        <p className="text-sm text-gray-400">
-          政策を入力すると、6種類の市民ペルソナがAIとして反応します
+      <header className="mb-8 border-b border-gray-200 pb-6">
+        <div className="block w-full border-2 border-gray-900 rounded-sm relative px-8 py-5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-3xl font-black tracking-[0.12em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>政策市民シミュレーター</span>
+            <span className="text-xs tracking-[0.2em] text-gray-500 border-l border-gray-300 pl-5">SOCIAL SIMULACRA</span>
+          </div>
+          <div className="absolute inset-[3px] border border-gray-400 rounded-sm pointer-events-none" />
+        </div>
+        <p className="mt-3 text-sm text-gray-500">
+          自治体を選び、政策を入力すると、AIが生成した市民ペルソナが反応します
         </p>
-      </div>
+      </header>
 
-      <PolicyInput policy={policy} onPolicyChange={setPolicy} onRun={runSimulation} isRunning={isRunning} />
-      <StanceBar counts={stanceCounts} visible={showStanceBar} />
+      <MunicipalityInput
+        value={municipality}
+        onChange={setMunicipality}
+        isGenerating={isGeneratingPersonas}
+        onGenerate={generatePersonas}
+        hasPersonas={personas.length > 0}
+      />
 
-      {/* Persona Grid */}
-      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PERSONAS.map((persona) => (
-          <PersonaCard
-            key={persona.id}
-            persona={persona}
-            response={personaResults[persona.id] ?? null}
-            isLoading={loadingPersonas.has(persona.id)}
-          />
-        ))}
-      </div>
+      {personas.length > 0 && (
+        <>
+          <div className="mb-4 text-xs text-gray-500">
+            {municipality} の市民ペルソナ（{personas.length}人）が生成されました
+          </div>
 
-      <AnalysisReport analysis={analysis} isLoading={analysisLoading} visible={showAnalysis} />
+          <PolicyInput policy={policy} onPolicyChange={setPolicy} onRun={runSimulation} isRunning={isRunning} />
+          <StanceBar counts={stanceCounts} visible={showStanceBar} />
 
-      <div className="mt-8 text-center text-[11px] text-gray-600">
-        Social Simulacra × 行政DX デモ — Powered by Claude API
-      </div>
+          <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {personas.map((persona) => (
+              <PersonaCard
+                key={persona.id}
+                persona={persona}
+                response={personaResults[persona.id] ?? null}
+                isLoading={loadingPersonas.has(persona.id)}
+              />
+            ))}
+          </div>
+
+          <AnalysisReport analysis={analysis} isLoading={analysisLoading} visible={showAnalysis} />
+        </>
+      )}
+
+      <footer className="mt-10 text-center text-xs text-gray-400">
+        Produced by KOIKOI, Inc.
+      </footer>
     </div>
   );
 }

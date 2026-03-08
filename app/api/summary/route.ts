@@ -19,9 +19,11 @@ export async function POST(req: NextRequest) {
     const result = await callAnthropic<AnalysisResponse>(
       systemPrompt,
       `政策：${policy}\n\n市民の反応：\n${responseSummary}`,
+      500,
     );
     return NextResponse.json(result);
-  } catch {
+  } catch (e) {
+    console.error("Summary API error:", e);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }
 }

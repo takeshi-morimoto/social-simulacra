@@ -1,10 +1,11 @@
 const API_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-haiku-4-5-20251001";
 const MAX_RETRIES = 3;
 
 export async function callAnthropic<T>(
   systemPrompt: string,
   userMessage: string,
+  maxTokens?: number,
 ): Promise<T> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
@@ -19,7 +20,7 @@ export async function callAnthropic<T>(
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1000,
+        max_tokens: maxTokens ?? 300,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       }),
