@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 
 interface Props {
   /** ref to the DOM element to capture */
@@ -21,24 +21,14 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
     if (!captureRef.current) return null;
     setIsCapturing(true);
     try {
-      const canvas = await html2canvas(captureRef.current, {
+      const dataUrl = await toPng(captureRef.current, {
         backgroundColor: "#f9fafb",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        ignoreElements: (el) => el.tagName === "STYLE",
-        onclone: (doc) => {
-          // Remove stylesheets that use unsupported color functions (lab, oklch, etc.)
-          doc.querySelectorAll("style").forEach((style) => {
-            if (style.textContent?.includes("lab(") || style.textContent?.includes("oklch(")) {
-              style.remove();
-            }
-          });
-        },
+        pixelRatio: 2,
       });
-      return await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((blob) => resolve(blob), "image/png")
-      );
+      const res = await fetch(dataUrl);
+      return await res.blob();
+    } catch {
+      return null;
     } finally {
       setIsCapturing(false);
     }
