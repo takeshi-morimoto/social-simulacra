@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import type { Persona, PersonaResponse, AnalysisResponse, StanceCounts } from "@/lib/types";
 import PolicyInput from "@/components/PolicyInput";
-import PolicyBadge from "@/components/PolicyBadge";
+
 import PersonaCard from "@/components/PersonaCard";
 import AnalysisReport from "@/components/AnalysisReport";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -43,12 +43,6 @@ export default function ListenMode({
       {isRunning && !showStanceBar && (
         <LoadingOverlay message="市民の反応をシミュレーション中..." estimateSeconds={15} />
       )}
-
-      <PolicyBadge
-        counts={stanceCounts}
-        approvalRate={analysis?.approval_rate}
-        visible={showStanceBar}
-      />
 
       {(showStanceBar || loadingPersonas.size > 0) && (
         <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
