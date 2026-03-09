@@ -24,6 +24,14 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
       const dataUrl = await toPng(captureRef.current, {
         backgroundColor: "#f9fafb",
         pixelRatio: 2,
+        skipFonts: true,
+        filter: (node: HTMLElement) => {
+          // Skip external link stylesheets that cause CORS errors
+          if (node.tagName === "LINK" && (node as HTMLLinkElement).rel === "stylesheet") {
+            return false;
+          }
+          return true;
+        },
       });
       const res = await fetch(dataUrl);
       return await res.blob();
