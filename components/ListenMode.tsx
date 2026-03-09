@@ -44,6 +44,13 @@ export default function ListenMode({
       )}
 
       <div ref={resultsRef}>
+        {showStanceBar && (
+          <div className="rounded-lg border border-gray-200 bg-white px-5 py-4 mb-4 shadow-sm">
+            <div className="text-[11px] text-gray-400 mb-1">シミュレーション対象</div>
+            <div className="text-xs text-gray-500 mb-1">{municipality}</div>
+            <div className="text-sm font-semibold text-gray-900 leading-6">「{policy}」</div>
+          </div>
+        )}
         <PolicyBadge
           counts={stanceCounts}
           approvalRate={analysis?.approval_rate}
