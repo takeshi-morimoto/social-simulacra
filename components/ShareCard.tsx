@@ -20,12 +20,12 @@ const STANCE_CONFIG = [
   { key: "強く反対" as const, emoji: "🚫", color: "#8B1A1A" },
 ];
 
-function getGradeEmoji(rate: number): string {
-  if (rate >= 80) return "🏆";
-  if (rate >= 60) return "🥈";
-  if (rate >= 40) return "⚖️";
-  if (rate >= 20) return "⚠️";
-  return "🚨";
+function getGrade(rate: number): { emoji: string; comment: string; color: string } {
+  if (rate >= 80) return { emoji: "🏆", comment: "素晴らしい政策です！市民から圧倒的な支持を得ています", color: "text-amber-700" };
+  if (rate >= 60) return { emoji: "🥈", comment: "良い政策です。多くの市民が前向きに評価しています", color: "text-slate-700" };
+  if (rate >= 40) return { emoji: "⚖️", comment: "賛否が分かれています。さらなる議論と改善が必要です", color: "text-orange-700" };
+  if (rate >= 20) return { emoji: "⚠️", comment: "支持が低い政策です。市民の声を聞いて見直しましょう", color: "text-red-600" };
+  return { emoji: "🚨", comment: "市民から強い反発があります。根本的な再検討が必要です", color: "text-red-800" };
 }
 
 export default function ShareCard({ municipality, policy, mode, stanceCounts, analysis, visible }: Props) {
@@ -84,16 +84,22 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
               )}
             </div>
 
-            {/* Approval rate */}
-            {analysis && (
-              <div className="flex items-center gap-2">
-                <span className="text-3xl">{getGradeEmoji(analysis.approval_rate)}</span>
-                <div>
-                  <div className="text-2xl font-black text-gray-900">{analysis.approval_rate}%</div>
-                  <div className="text-[10px] text-gray-400">推定支持率</div>
+            {/* Approval rate + comment */}
+            {analysis && (() => {
+              const grade = getGrade(analysis.approval_rate);
+              return (
+                <div className="flex items-center gap-3 rounded-lg bg-white/60 border border-gray-200 px-4 py-3">
+                  <span className="text-4xl">{grade.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="text-2xl font-black text-gray-900">{analysis.approval_rate}%</span>
+                      <span className="text-[10px] text-gray-400">推定支持率</span>
+                    </div>
+                    <div className={`text-xs font-semibold leading-5 ${grade.color}`}>{grade.comment}</div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
