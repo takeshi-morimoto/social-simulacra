@@ -1,4 +1,4 @@
-export type Stance = "賛成" | "条件付き賛成" | "反対" | "中立";
+export type Stance = "強く賛成" | "賛成" | "条件付き賛成" | "中立" | "反対" | "強く反対";
 
 export interface Persona {
   id: number;

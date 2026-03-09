@@ -11,7 +11,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 
 type Mode = "listen" | "propose";
 
-const INITIAL_COUNTS: StanceCounts = { "賛成": 0, "条件付き賛成": 0, "反対": 0, "中立": 0 };
+const INITIAL_COUNTS: StanceCounts = { "強く賛成": 0, "賛成": 0, "条件付き賛成": 0, "中立": 0, "反対": 0, "強く反対": 0 };
 
 export default function Home() {
   const [municipality, setMunicipality] = useState("");

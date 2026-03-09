@@ -26,10 +26,19 @@ function getGrade(approvalRate: number): Grade {
   return { label: "強い反発", sublabel: "Critical", emoji: "🚨", bg: "bg-gradient-to-br from-red-100 to-red-50", border: "border-red-500", text: "text-red-800", glow: "shadow-red-200" };
 }
 
+const STANCE_BAR_CONFIG: { key: keyof StanceCounts; color: string; label: string }[] = [
+  { key: "強く賛成", color: "#1A6B50", label: "強く賛成" },
+  { key: "賛成", color: "#2B8A6E", label: "賛成" },
+  { key: "条件付き賛成", color: "#D4850A", label: "条件付き" },
+  { key: "中立", color: "#9CA3AF", label: "中立" },
+  { key: "反対", color: "#C0392B", label: "反対" },
+  { key: "強く反対", color: "#8B1A1A", label: "強く反対" },
+];
+
 function getStanceGrade(counts: StanceCounts): Grade {
-  const total = counts["賛成"] + counts["条件付き賛成"] + counts["反対"] + counts["中立"];
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (total === 0) return getGrade(50);
-  const rate = ((counts["賛成"] + counts["条件付き賛成"] * 0.5) / total) * 100;
+  const rate = ((counts["強く賛成"] + counts["賛成"] + counts["条件付き賛成"] * 0.5) / total) * 100;
   return getGrade(rate);
 }
 
@@ -37,45 +46,35 @@ export default function PolicyBadge({ counts, approvalRate, visible }: Props) {
   if (!visible) return null;
 
   const grade = approvalRate != null ? getGrade(approvalRate) : getStanceGrade(counts);
-  const total = counts["賛成"] + counts["条件付き賛成"] + counts["反対"] + counts["中立"];
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
     <div className={`animate-fade-in rounded-xl border-2 ${grade.border} ${grade.bg} p-5 mb-6 shadow-lg ${grade.glow}`}>
       <div className="flex items-center gap-4">
-        {/* Badge icon */}
         <div className="text-5xl">{grade.emoji}</div>
 
         <div className="flex-1 min-w-0">
-          {/* Grade label */}
           <div className="flex items-baseline gap-2 mb-1">
             <span className={`text-lg font-bold ${grade.text}`}>{grade.label}</span>
             <span className="text-xs text-gray-400 font-medium">{grade.sublabel}</span>
           </div>
 
-          {/* Visual bar */}
           {total > 0 && (
             <div className="flex h-3 overflow-hidden rounded-full mb-2">
-              {counts["賛成"] > 0 && (
-                <div className="bg-[#2B8A6E] transition-all duration-700" style={{ width: `${(counts["賛成"] / total) * 100}%` }} />
-              )}
-              {counts["条件付き賛成"] > 0 && (
-                <div className="bg-[#D4850A] transition-all duration-700" style={{ width: `${(counts["条件付き賛成"] / total) * 100}%` }} />
-              )}
-              {counts["反対"] > 0 && (
-                <div className="bg-[#C0392B] transition-all duration-700" style={{ width: `${(counts["反対"] / total) * 100}%` }} />
-              )}
-              {counts["中立"] > 0 && (
-                <div className="bg-[#9CA3AF] transition-all duration-700" style={{ width: `${(counts["中立"] / total) * 100}%` }} />
+              {STANCE_BAR_CONFIG.map(({ key, color }) =>
+                counts[key] > 0 ? (
+                  <div key={key} className="transition-all duration-700" style={{ width: `${(counts[key] / total) * 100}%`, backgroundColor: color }} />
+                ) : null
               )}
             </div>
           )}
 
-          {/* Counts */}
           <div className="flex flex-wrap gap-3 text-xs">
-            <span className="font-semibold text-[#2B8A6E]">賛成 {counts["賛成"]}</span>
-            <span className="font-semibold text-[#D4850A]">条件付き {counts["条件付き賛成"]}</span>
-            <span className="font-semibold text-[#C0392B]">反対 {counts["反対"]}</span>
-            <span className="font-semibold text-gray-400">中立 {counts["中立"]}</span>
+            {STANCE_BAR_CONFIG.map(({ key, color, label }) =>
+              counts[key] > 0 ? (
+                <span key={key} className="font-semibold" style={{ color }}>{label} {counts[key]}</span>
+              ) : null
+            )}
             {approvalRate != null && (
               <span className={`font-bold ${grade.text} ml-auto`}>支持率 {approvalRate}%</span>
             )}

@@ -28,17 +28,21 @@ function CardHeader({ persona }: { persona: Persona }) {
 }
 
 const STANCE_BADGE: Record<string, { emoji: string; bg: string; border: string; text: string }> = {
+  "強く賛成": { emoji: "💪", bg: "bg-emerald-50", border: "border-emerald-300", text: "text-emerald-800" },
   "賛成": { emoji: "👍", bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
   "条件付き賛成": { emoji: "🤔", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
-  "反対": { emoji: "👎", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
   "中立": { emoji: "😐", bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-600" },
+  "反対": { emoji: "👎", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" },
+  "強く反対": { emoji: "🚫", bg: "bg-red-100", border: "border-red-400", text: "text-red-900" },
 };
 
 export default function PersonaCard({ persona, response, isLoading }: Props) {
   const stanceColor =
-    response?.stance === "賛成" ? "#2B8A6E"
-    : response?.stance === "反対" ? "#C0392B"
+    response?.stance === "強く賛成" ? "#1A6B50"
+    : response?.stance === "賛成" ? "#2B8A6E"
     : response?.stance === "条件付き賛成" ? "#D4850A"
+    : response?.stance === "反対" ? "#C0392B"
+    : response?.stance === "強く反対" ? "#8B1A1A"
     : "#6B7280";
 
   const badge = response ? STANCE_BADGE[response.stance] ?? STANCE_BADGE["中立"] : null;

@@ -33,7 +33,7 @@ export default function ListenMode({
 }: Props) {
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const shareText = `【${municipality}】「${policy}」を市民シミュレーション\n👍賛成${stanceCounts["賛成"]}人 🤔条件付き${stanceCounts["条件付き賛成"]}人 👎反対${stanceCounts["反対"]}人 😐中立${stanceCounts["中立"]}人\n${analysis ? `支持率: ${analysis.approval_rate}% ${analysis.approval_rate >= 80 ? "🏆" : analysis.approval_rate >= 60 ? "🥈" : analysis.approval_rate >= 40 ? "⚖️" : "⚠️"}` : ""}\n#政策市民シミュレーター #SocialSimulacra`;
+  const shareText = `【${municipality}】「${policy}」を市民シミュレーション\n💪強く賛成${stanceCounts["強く賛成"]} 👍賛成${stanceCounts["賛成"]} 🤔条件付き${stanceCounts["条件付き賛成"]} 😐中立${stanceCounts["中立"]} 👎反対${stanceCounts["反対"]} 🚫強く反対${stanceCounts["強く反対"]}\n${analysis ? `支持率: ${analysis.approval_rate}% ${analysis.approval_rate >= 80 ? "🏆" : analysis.approval_rate >= 60 ? "🥈" : analysis.approval_rate >= 40 ? "⚖️" : "⚠️"}` : ""}\n#政策市民シミュレーター #SocialSimulacra`;
 
   return (
     <>
