@@ -25,12 +25,15 @@ const STANCE_CONFIG = [
 const PRO_STANCES = new Set(["強く賛成", "賛成", "条件付き賛成"]);
 const CON_STANCES = new Set(["反対", "強く反対"]);
 
-function getGradeEmoji(rate: number): string {
-  if (rate >= 80) return "🏆";
-  if (rate >= 60) return "🥈";
-  if (rate >= 40) return "⚖️";
-  if (rate >= 20) return "⚠️";
-  return "🚨";
+type LetterGrade = { letter: string; bg: string; border: string };
+
+function getLetterGrade(rate: number): LetterGrade {
+  if (rate >= 90) return { letter: "S", bg: "from-amber-400 to-yellow-500", border: "border-amber-400" };
+  if (rate >= 75) return { letter: "A", bg: "from-emerald-400 to-green-500", border: "border-emerald-400" };
+  if (rate >= 60) return { letter: "B", bg: "from-blue-400 to-sky-500", border: "border-blue-400" };
+  if (rate >= 40) return { letter: "C", bg: "from-orange-400 to-amber-500", border: "border-orange-400" };
+  if (rate >= 20) return { letter: "D", bg: "from-red-400 to-rose-500", border: "border-red-400" };
+  return { letter: "F", bg: "from-red-600 to-red-800", border: "border-red-600" };
 }
 
 function getRepresentativeOpinion(
@@ -47,6 +50,72 @@ function getRepresentativeOpinion(
   return null;
 }
 
+/* Decorative background SVG illustrations (very faint) */
+function BgIllustrations() {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.04 }}>
+      {/* City buildings - bottom right */}
+      <svg className="absolute bottom-2 right-4" width="180" height="120" viewBox="0 0 180 120" fill="none">
+        <rect x="10" y="40" width="30" height="80" rx="3" fill="currentColor" />
+        <rect x="16" y="48" width="8" height="8" rx="1" fill="white" />
+        <rect x="16" y="62" width="8" height="8" rx="1" fill="white" />
+        <rect x="16" y="76" width="8" height="8" rx="1" fill="white" />
+        <rect x="28" y="48" width="8" height="8" rx="1" fill="white" />
+        <rect x="28" y="62" width="8" height="8" rx="1" fill="white" />
+        <rect x="50" y="20" width="35" height="100" rx="3" fill="currentColor" />
+        <rect x="56" y="28" width="8" height="8" rx="1" fill="white" />
+        <rect x="56" y="42" width="8" height="8" rx="1" fill="white" />
+        <rect x="56" y="56" width="8" height="8" rx="1" fill="white" />
+        <rect x="56" y="70" width="8" height="8" rx="1" fill="white" />
+        <rect x="70" y="28" width="8" height="8" rx="1" fill="white" />
+        <rect x="70" y="42" width="8" height="8" rx="1" fill="white" />
+        <rect x="70" y="56" width="8" height="8" rx="1" fill="white" />
+        <rect x="95" y="55" width="25" height="65" rx="3" fill="currentColor" />
+        <rect x="100" y="62" width="6" height="6" rx="1" fill="white" />
+        <rect x="100" y="74" width="6" height="6" rx="1" fill="white" />
+        <rect x="110" y="62" width="6" height="6" rx="1" fill="white" />
+        <rect x="130" y="35" width="40" height="85" rx="3" fill="currentColor" />
+        <rect x="137" y="42" width="8" height="8" rx="1" fill="white" />
+        <rect x="137" y="56" width="8" height="8" rx="1" fill="white" />
+        <rect x="137" y="70" width="8" height="8" rx="1" fill="white" />
+        <rect x="152" y="42" width="8" height="8" rx="1" fill="white" />
+        <rect x="152" y="56" width="8" height="8" rx="1" fill="white" />
+        {/* Triangle roof on short building */}
+        <polygon points="95,55 107,38 120,55" fill="currentColor" />
+      </svg>
+
+      {/* Speech bubbles - top left */}
+      <svg className="absolute top-6 left-6" width="100" height="80" viewBox="0 0 100 80" fill="none">
+        <ellipse cx="40" cy="25" rx="35" ry="22" fill="currentColor" />
+        <polygon points="30,44 25,60 42,42" fill="currentColor" />
+        <ellipse cx="72" cy="50" rx="24" ry="16" fill="currentColor" />
+        <polygon points="75,64 80,76 68,62" fill="currentColor" />
+      </svg>
+
+      {/* People silhouettes - bottom left */}
+      <svg className="absolute bottom-4 left-8" width="120" height="60" viewBox="0 0 120 60" fill="none">
+        <circle cx="20" cy="15" r="8" fill="currentColor" />
+        <ellipse cx="20" cy="42" rx="12" ry="18" fill="currentColor" />
+        <circle cx="55" cy="18" r="7" fill="currentColor" />
+        <ellipse cx="55" cy="43" rx="10" ry="17" fill="currentColor" />
+        <circle cx="85" cy="13" r="9" fill="currentColor" />
+        <ellipse cx="85" cy="42" rx="13" ry="18" fill="currentColor" />
+        <circle cx="110" cy="20" r="6" fill="currentColor" />
+        <ellipse cx="110" cy="44" rx="9" ry="16" fill="currentColor" />
+      </svg>
+
+      {/* Decorative dots / stars - scattered */}
+      <svg className="absolute top-8 right-20" width="60" height="60" viewBox="0 0 60 60" fill="none">
+        <circle cx="10" cy="10" r="4" fill="currentColor" />
+        <circle cx="40" cy="8" r="3" fill="currentColor" />
+        <circle cx="25" cy="35" r="5" fill="currentColor" />
+        <circle cx="50" cy="45" r="3" fill="currentColor" />
+        <circle cx="8" cy="50" r="4" fill="currentColor" />
+      </svg>
+    </div>
+  );
+}
+
 export default function ShareCard({ municipality, policy, mode, stanceCounts, analysis, personas, personaResults, visible }: Props) {
   if (!visible) return null;
 
@@ -60,8 +129,11 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
         {/* Inner border */}
         <div className="absolute inset-[4px] border border-gray-300 rounded-lg pointer-events-none" />
 
+        {/* Background illustrations */}
+        <BgIllustrations />
+
         {/* Top: Brand + Policy */}
-        <div className="px-6 pt-5 pb-3">
+        <div className="px-6 pt-5 pb-3 relative">
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-sm font-black tracking-[0.1em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
             <span className="text-[9px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SOCIAL SIMULACRA</span>
@@ -75,14 +147,17 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
           )}
         </div>
 
-        {/* Middle: Approval rate + bar (centered) */}
+        {/* Middle */}
         {mode === "listen" && stanceCounts && total > 0 && analysis && (() => {
-          const emoji = getGradeEmoji(analysis.approval_rate);
+          const grade = getLetterGrade(analysis.approval_rate);
           return (
-            <div className="flex-1 flex flex-col justify-center px-6">
-              {/* Approval rate + AI comment */}
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-4xl">{emoji}</span>
+            <div className="flex-1 flex flex-col justify-center px-6 relative">
+              <div className="flex items-start gap-4 mb-3">
+                {/* Letter grade badge */}
+                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${grade.bg} border-2 ${grade.border} flex items-center justify-center shadow-md shrink-0`}>
+                  <span className="text-3xl font-black text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>{grade.letter}</span>
+                </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-0.5">
                     <span className="text-3xl font-black text-gray-900">{analysis.approval_rate}%</span>
@@ -91,7 +166,7 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
                 </div>
               </div>
 
-              {/* AI share comment - prominent display */}
+              {/* AI share comment */}
               {analysis.share_comment && (
                 <div className="rounded-lg bg-gray-900 px-4 py-2.5 mb-3">
                   <div className="text-sm font-bold text-white leading-6">💬 {analysis.share_comment}</div>
@@ -151,7 +226,7 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
         )}
 
         {/* Bottom: CTA + Footer */}
-        <div className="flex items-center justify-between px-6 pb-3 pt-1">
+        <div className="flex items-center justify-between px-6 pb-3 pt-1 relative">
           <span className="text-[10px] text-gray-500 bg-gray-100 rounded-full px-3 py-1">👉 あなたの街でも試してみよう</span>
           <span className="text-[9px] text-gray-400">Produced by KOIKOI, Inc.</span>
         </div>
