@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       4096,
     );
 
-    const personas: Persona[] = result.personas.map((g, i) => ({
+    const personas: Persona[] = result.personas.slice(0, 15).map((g, i) => ({
       id: i + 1,
       name: g.name,
       age: g.age,
