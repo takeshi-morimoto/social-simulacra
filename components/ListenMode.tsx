@@ -5,7 +5,7 @@ import type { Persona, PersonaResponse, AnalysisResponse, StanceCounts } from "@
 import PolicyInput from "@/components/PolicyInput";
 
 import PersonaCard from "@/components/PersonaCard";
-import OpinionSummary from "@/components/OpinionSummary";
+
 import AnalysisReport from "@/components/AnalysisReport";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ShareCard from "@/components/ShareCard";
@@ -57,12 +57,6 @@ export default function ListenMode({
           ))}
         </div>
       )}
-
-      <OpinionSummary
-        personas={personas}
-        results={personaResults}
-        visible={showStanceBar && loadingPersonas.size === 0}
-      />
 
       {analysisLoading && (
         <LoadingOverlay message="アナリシスレポートを生成中..." estimateSeconds={8} />
