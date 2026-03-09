@@ -24,6 +24,7 @@ export interface AnalysisResponse {
   risks: string[];
   recommendations: string[];
   approval_rate: number;
+  share_comment: string;
 }
 
 export type StanceCounts = Record<Stance, number>;

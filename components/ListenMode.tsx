@@ -35,14 +35,14 @@ export default function ListenMode({
 }: Props) {
   const shareCardRef = useRef<HTMLDivElement>(null);
 
-  const shareText = `【${municipality}】「${policy}」を市民シミュレーション\n💪強く賛成${stanceCounts["強く賛成"]} 👍賛成${stanceCounts["賛成"]} 🤔条件付き${stanceCounts["条件付き賛成"]} 😐中立${stanceCounts["中立"]} 👎反対${stanceCounts["反対"]} 🚫強く反対${stanceCounts["強く反対"]}\n${analysis ? `支持率: ${analysis.approval_rate}% ${analysis.approval_rate >= 80 ? "🏆" : analysis.approval_rate >= 60 ? "🥈" : analysis.approval_rate >= 40 ? "⚖️" : "⚠️"}` : ""}\n#AI市長 #SocialSimulacra`;
+  const shareText = `【${municipality}】「${policy}」\n${analysis?.share_comment ?? ""}\n支持率: ${analysis?.approval_rate ?? 0}%\n#AI市長 #SocialSimulacra`;
 
   return (
     <>
       <PolicyInput policy={policy} onPolicyChange={onPolicyChange} onRun={onRun} isRunning={isRunning} />
 
       {isRunning && !showStanceBar && (
-        <LoadingOverlay message="市民の反応をシミュレーション中..." estimateSeconds={15} />
+        <LoadingOverlay message="市民の反応をシミュレーション中..." estimateSeconds={10} />
       )}
 
       {(showStanceBar || loadingPersonas.size > 0) && (

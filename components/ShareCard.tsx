@@ -88,7 +88,9 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
                     <span className="text-3xl font-black text-gray-900">{analysis.approval_rate}%</span>
                     <span className="text-[10px] text-gray-400 font-medium">推定支持率</span>
                   </div>
-                  <div className={`text-xs font-bold leading-5 ${grade.color}`}>{grade.comment}</div>
+                  <div className={`text-xs font-bold leading-5 ${grade.color}`}>
+                    {analysis.share_comment || grade.comment}
+                  </div>
                 </div>
               </div>
 
