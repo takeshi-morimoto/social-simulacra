@@ -13,126 +13,142 @@ export default async function Image() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+          position: "relative",
+          overflow: "hidden",
           fontFamily: "sans-serif",
+          background: "#0f172a",
         }}
       >
-        {/* Border frame */}
+        {/* Background gradient circles */}
+        <div style={{ position: "absolute", top: -120, right: -80, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,115,181,0.3) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", bottom: -100, left: -60, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(43,138,110,0.25) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: 100, left: 300, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(212,133,10,0.15) 0%, transparent 70%)" }} />
+
+        {/* Content */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            border: "4px solid #1a1a1a",
-            borderRadius: "4px",
-            padding: "48px 80px",
-            position: "relative",
+            width: "100%",
+            height: "100%",
+            padding: "50px 70px",
           }}
         >
-          {/* Inner border */}
+          {/* Left side */}
           <div
             style={{
-              position: "absolute",
-              top: "6px",
-              left: "6px",
-              right: "6px",
-              bottom: "6px",
-              border: "1.5px solid #9ca3af",
-              borderRadius: "3px",
-            }}
-          />
-
-          {/* Title */}
-          <div
-            style={{
-              fontSize: 64,
-              fontWeight: 900,
-              color: "#111827",
-              letterSpacing: "0.08em",
-              marginBottom: 16,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              flex: 1,
             }}
           >
-            AI市長
+            {/* Title area */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  fontSize: 80,
+                  fontWeight: 900,
+                  color: "#ffffff",
+                  letterSpacing: "0.06em",
+                  lineHeight: 1.1,
+                }}
+              >
+                AI市長
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  color: "#64748b",
+                  letterSpacing: "0.25em",
+                  marginTop: 12,
+                }}
+              >
+                SOCIAL SIMULACRA
+              </div>
+              <div
+                style={{
+                  width: 80,
+                  height: 4,
+                  background: "linear-gradient(90deg, #1A73B5, #2B8A6E)",
+                  borderRadius: 2,
+                  marginTop: 20,
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <div
+              style={{
+                fontSize: 26,
+                color: "#94a3b8",
+                lineHeight: 1.7,
+                maxWidth: 480,
+              }}
+            >
+              AIが生成した市民ペルソナが
+              <br />
+              あなたの政策に反応する
+            </div>
+
+            {/* Stance bar */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", maxWidth: 400 }}>
+                <div style={{ width: "20%", background: "#1A6B50" }} />
+                <div style={{ width: "25%", background: "#2B8A6E" }} />
+                <div style={{ width: "15%", background: "#D4850A" }} />
+                <div style={{ width: "10%", background: "#9CA3AF" }} />
+                <div style={{ width: "20%", background: "#C0392B" }} />
+                <div style={{ width: "10%", background: "#8B1A1A" }} />
+              </div>
+              <div style={{ display: "flex", gap: 16, fontSize: 15 }}>
+                <span style={{ color: "#1A6B50" }}>💪 強く賛成</span>
+                <span style={{ color: "#2B8A6E" }}>👍 賛成</span>
+                <span style={{ color: "#D4850A" }}>🤔 条件付き</span>
+                <span style={{ color: "#9CA3AF" }}>😐 中立</span>
+                <span style={{ color: "#C0392B" }}>👎 反対</span>
+                <span style={{ color: "#8B1A1A" }}>🚫 強く反対</span>
+              </div>
+            </div>
           </div>
 
-          {/* Subtitle */}
+          {/* Right side - persona grid */}
           <div
             style={{
-              fontSize: 24,
-              color: "#6b7280",
-              letterSpacing: "0.2em",
-              marginBottom: 40,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              gap: 12,
+              marginLeft: 40,
             }}
           >
-            SOCIAL SIMULACRA
-          </div>
-        </div>
-
-        {/* Description */}
-        <div
-          style={{
-            fontSize: 28,
-            color: "#4b5563",
-            marginTop: 40,
-            textAlign: "center",
-            maxWidth: 800,
-            lineHeight: 1.6,
-          }}
-        >
-          AIが生成した市民ペルソナが政策に反応する
-        </div>
-
-        {/* Persona icons row */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginTop: 32,
-            fontSize: 40,
-          }}
-        >
-          <span>👵</span>
-          <span>🧑‍💼</span>
-          <span>👩‍💻</span>
-          <span>👨‍👩‍👧</span>
-          <span>🎓</span>
-          <span>👴</span>
-          <span>🧑‍🔧</span>
-          <span>👩‍👦</span>
-          <span>🤝</span>
-        </div>
-
-        {/* Stance badges */}
-        <div
-          style={{
-            display: "flex",
-            gap: 20,
-            marginTop: 28,
-            fontSize: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>💪</span>
-            <span style={{ color: "#1A6B50", fontWeight: 700 }}>強く賛成</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>👍</span>
-            <span style={{ color: "#2B8A6E", fontWeight: 700 }}>賛成</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>🤔</span>
-            <span style={{ color: "#D4850A", fontWeight: 700 }}>条件付き</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>👎</span>
-            <span style={{ color: "#C0392B", fontWeight: 700 }}>反対</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span>🚫</span>
-            <span style={{ color: "#8B1A1A", fontWeight: 700 }}>強く反対</span>
+            {[
+              ["👵", "👴", "🧑‍💼"],
+              ["👩‍💻", "👨‍👩‍👧", "🎓"],
+              ["🧑‍🔧", "👩‍👦", "💼"],
+              ["🤝", "🚕", "👷"],
+              ["👩‍🍳", "🧑", "👩"],
+            ].map((row, ri) => (
+              <div key={ri} style={{ display: "flex", gap: 12 }}>
+                {row.map((icon, ci) => (
+                  <div
+                    key={ci}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 16,
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 32,
+                    }}
+                  >
+                    {icon}
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -140,12 +156,16 @@ export default async function Image() {
         <div
           style={{
             position: "absolute",
-            bottom: 24,
-            fontSize: 18,
-            color: "#9ca3af",
+            bottom: 20,
+            left: 70,
+            right: 70,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          Produced by KOIKOI, Inc.
+          <span style={{ fontSize: 14, color: "#475569" }}>Produced by KOIKOI, Inc.</span>
+          <span style={{ fontSize: 14, color: "#475569" }}>ai-mayor.vercel.app</span>
         </div>
       </div>
     ),
