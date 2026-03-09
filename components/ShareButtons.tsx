@@ -12,6 +12,7 @@ interface Props {
 
 export default function ShareButtons({ captureRef, shareText }: Props) {
   const [isCapturing, setIsCapturing] = useState(false);
+  const [copiedToast, setCopiedToast] = useState(false);
   const linkRef = useRef<HTMLAnchorElement>(null);
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -88,18 +89,31 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           {isCapturing ? "キャプチャ中..." : "画像として保存"}
         </button>
 
-        {/* Twitter/X */}
-        <a
-          href={`https://twitter.com/intent/tweet?text=${encoded}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors no-underline"
+        {/* Twitter/X - copy image to clipboard then open compose */}
+        <button
+          onClick={async () => {
+            const blob = await captureImage();
+            if (blob) {
+              try {
+                await navigator.clipboard.write([
+                  new ClipboardItem({ "image/png": blob }),
+                ]);
+                setCopiedToast(true);
+                setTimeout(() => setCopiedToast(false), 4000);
+              } catch {
+                // clipboard API not supported, fallback
+              }
+            }
+            window.open(`https://twitter.com/intent/tweet?text=${encoded}`, "_blank");
+          }}
+          disabled={isCapturing}
+          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
           X (Twitter)
-        </a>
+        </button>
 
         {/* Facebook */}
         <a
@@ -141,6 +155,13 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           </button>
         )}
       </div>
+
+      {/* Toast: image copied */}
+      {copiedToast && (
+        <div className="mt-3 rounded-lg bg-green-50 border border-green-200 px-4 py-2.5 text-xs text-green-800 font-medium animate-pulse">
+          📋 画像をクリップボードにコピーしました！Xの投稿画面で Ctrl+V（貼り付け）して画像を添付してください
+        </div>
+      )}
 
       {/* hidden download link */}
       <a ref={linkRef} className="hidden" />
