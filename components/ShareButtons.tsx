@@ -26,6 +26,15 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
         scale: 2,
         useCORS: true,
         logging: false,
+        ignoreElements: (el) => el.tagName === "STYLE",
+        onclone: (doc) => {
+          // Remove stylesheets that use unsupported color functions (lab, oklch, etc.)
+          doc.querySelectorAll("style").forEach((style) => {
+            if (style.textContent?.includes("lab(") || style.textContent?.includes("oklch(")) {
+              style.remove();
+            }
+          });
+        },
       });
       return await new Promise<Blob | null>((resolve) =>
         canvas.toBlob((blob) => resolve(blob), "image/png")
