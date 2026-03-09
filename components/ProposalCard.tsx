@@ -35,7 +35,13 @@ export default function ProposalCard({ persona, proposal, isLoading }: Props) {
       )}
 
       {!isLoading && !proposal && (
-        <div className="text-xs text-gray-400 italic">{persona.detail}</div>
+        <div className="space-y-1.5">
+          <div className="text-xs text-gray-600 leading-5">{persona.detail}</div>
+          <div className="flex flex-wrap gap-1">
+            <span className="rounded bg-purple-50 border border-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">{persona.personality}</span>
+            <span className="rounded bg-teal-50 border border-teal-100 px-1.5 py-0.5 text-[10px] text-teal-700">{persona.concern}</span>
+          </div>
+        </div>
       )}
 
       {!isLoading && proposal && (

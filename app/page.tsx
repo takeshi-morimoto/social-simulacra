@@ -4,11 +4,9 @@ import { useState, useCallback } from "react";
 import type { Persona, PersonaResponse, AnalysisResponse, StanceCounts, Stance, PolicyProposal, DemographicProfile } from "@/lib/types";
 import MunicipalityInput from "@/components/MunicipalityInput";
 import DemographicsPanel from "@/components/DemographicsPanel";
-import PolicyInput from "@/components/PolicyInput";
-import StanceBar from "@/components/StanceBar";
-import PersonaCard from "@/components/PersonaCard";
-import ProposalCard from "@/components/ProposalCard";
-import AnalysisReport from "@/components/AnalysisReport";
+import PersonaList from "@/components/PersonaList";
+import ListenMode from "@/components/ListenMode";
+import ProposeMode from "@/components/ProposeMode";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
 type Mode = "listen" | "propose";
@@ -121,7 +119,6 @@ export default function Home() {
 
     setLoadingPersonas(new Set());
     setShowStanceBar(true);
-
     setShowAnalysis(true);
     setAnalysisLoading(true);
 
@@ -178,7 +175,6 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-[960px] px-5 py-8">
-      {/* Header */}
       <header className="mb-8 border-b border-gray-200 pb-6">
         <div className="inline-block w-full border-2 border-gray-900 rounded-sm relative px-8 py-5">
           <div className="flex items-baseline justify-between">
@@ -201,7 +197,7 @@ export default function Home() {
       />
 
       {isGeneratingPersonas && (
-        <LoadingOverlay message="ペルソナを生成しています..." estimateSeconds={10} />
+        <LoadingOverlay message="ペルソナを生成しています..." estimateSeconds={25} />
       )}
 
       {personas.length > 0 && !isGeneratingPersonas && (
@@ -210,21 +206,7 @@ export default function Home() {
             <DemographicsPanel demographics={demographics} municipality={municipality} />
           )}
 
-          {/* Generated Personas List */}
-          <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 text-xs font-semibold text-gray-500">生成されたペルソナ</div>
-            <div className="flex flex-wrap gap-2">
-              {personas.map((p) => (
-                <div key={p.id} className="flex items-center gap-1.5 rounded-md border border-gray-150 bg-gray-50 px-2.5 py-1.5">
-                  <span className="text-base">{p.icon}</span>
-                  <div>
-                    <div className="text-[11px] font-semibold text-gray-800">{p.name}</div>
-                    <div className="text-[10px] text-gray-400">{p.age}歳 · {p.role}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PersonaList personas={personas} />
 
           {/* Mode Tabs */}
           <div className="flex mb-6 border-b border-gray-200">
@@ -250,74 +232,33 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Listen Mode */}
           {mode === "listen" && (
-            <>
-              <PolicyInput policy={policy} onPolicyChange={setPolicy} onRun={runSimulation} isRunning={isRunning} />
-
-              {isRunning && !showStanceBar && (
-                <LoadingOverlay message="市民の反応をシミュレーション中..." estimateSeconds={15} />
-              )}
-
-              <StanceBar counts={stanceCounts} visible={showStanceBar} />
-
-              {(showStanceBar || loadingPersonas.size > 0) && (
-                <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {personas.map((persona) => (
-                    <PersonaCard
-                      key={persona.id}
-                      persona={persona}
-                      response={personaResults[persona.id] ?? null}
-                      isLoading={loadingPersonas.has(persona.id)}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {analysisLoading && (
-                <LoadingOverlay message="アナリシスレポートを生成中..." estimateSeconds={8} />
-              )}
-
-              <AnalysisReport analysis={analysis} isLoading={false} visible={showAnalysis && !analysisLoading} />
-            </>
+            <ListenMode
+              municipality={municipality}
+              policy={policy}
+              onPolicyChange={setPolicy}
+              onRun={runSimulation}
+              isRunning={isRunning}
+              personas={personas}
+              personaResults={personaResults}
+              loadingPersonas={loadingPersonas}
+              stanceCounts={stanceCounts}
+              showStanceBar={showStanceBar}
+              analysis={analysis}
+              analysisLoading={analysisLoading}
+              showAnalysis={showAnalysis}
+            />
           )}
 
-          {/* Propose Mode */}
           {mode === "propose" && (
-            <>
-              <div className="rounded-lg border border-gray-200 bg-white p-5 mb-6 shadow-sm">
-                <div className="mb-3 text-sm font-semibold text-gray-800">
-                  {municipality}の市民ペルソナが自ら政策を提案します
-                </div>
-                <p className="text-xs text-gray-500 mb-4">
-                  各ペルソナが自分の立場・生活状況から、この自治体に必要だと思う政策を1つ提案します。
-                </p>
-                <button
-                  onClick={runProposals}
-                  disabled={isProposing}
-                  className="w-full rounded-md bg-[#1A73B5] py-2.5 text-sm font-semibold text-white transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed enabled:hover:bg-[#155A8A] cursor-pointer border-none"
-                >
-                  {isProposing ? "立案中..." : hasProposed ? "もう一度立案する" : "政策を立案する"}
-                </button>
-              </div>
-
-              {isProposing && (
-                <LoadingOverlay message="市民ペルソナが政策を考えています..." estimateSeconds={15} />
-              )}
-
-              {hasProposed && !isProposing && (
-                <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {personas.map((persona) => (
-                    <ProposalCard
-                      key={persona.id}
-                      persona={persona}
-                      proposal={proposals[persona.id] ?? null}
-                      isLoading={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+            <ProposeMode
+              municipality={municipality}
+              personas={personas}
+              proposals={proposals}
+              isProposing={isProposing}
+              hasProposed={hasProposed}
+              onRunProposals={runProposals}
+            />
           )}
         </>
       )}

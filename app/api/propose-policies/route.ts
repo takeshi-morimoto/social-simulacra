@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   }
 
   const personaList = personas.map(
-    (p) => `- ID:${p.id} / ${p.name} / ${p.age}歳 / ${p.role} / ${p.detail}`
+    (p) => `- ID:${p.id} / ${p.name} / ${p.age}歳 / ${p.role} / ${p.detail} / 性格:${p.personality} / 関心事:${p.concern}`
   ).join("\n");
 
   const systemPrompt = `あなたは市民シミュレーターです。以下の${personas.length}人の市民ペルソナそれぞれが、${municipality}をより良くするために自分の立場から政策を1つ提案します。

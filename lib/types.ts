@@ -9,6 +9,8 @@ export interface Persona {
   color: string;
   bg: string;
   detail: string;
+  personality: string;
+  concern: string;
 }
 
 export interface PersonaResponse {

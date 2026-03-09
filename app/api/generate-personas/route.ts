@@ -11,6 +11,8 @@ type GeneratedPersona = {
   age: number;
   role: string;
   detail: string;
+  personality: string;
+  concern: string;
 };
 
 type ApiResponse = {
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
     ]
   },
   "personas": [
-    {"name":"フルネーム","age":数値,"role":"職業・立場（10文字以内）","detail":"背景説明（40文字以内）"},
+    {"name":"フルネーム","age":数値,"role":"職業・立場（10文字以内）","detail":"具体的な背景（80文字以内。家族構成・経歴・暮らしぶりを具体的に）","personality":"性格・価値観（30文字以内。例：保守的で地域の伝統を重んじる）","concern":"今一番の関心事（30文字以内。例：後継者不足と農地の維持）"},
     ...15人分
   ]
 }`;
@@ -93,6 +95,8 @@ export async function POST(req: NextRequest) {
       color: COLORS[i % COLORS.length],
       bg: BGS[i % BGS.length],
       detail: g.detail,
+      personality: g.personality,
+      concern: g.concern,
     }));
 
     return NextResponse.json({

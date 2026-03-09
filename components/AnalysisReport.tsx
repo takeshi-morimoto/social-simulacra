@@ -12,7 +12,7 @@ export default function AnalysisReport({ analysis, isLoading, visible }: Props) 
   if (!visible) return null;
 
   return (
-    <div className="animate-fade-in rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="animate-fade-in rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">
       <div className="mb-4 text-sm font-semibold text-gray-800">政策アナリシスレポート</div>
 
       {isLoading && (
