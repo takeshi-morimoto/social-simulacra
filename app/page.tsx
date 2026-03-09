@@ -178,7 +178,7 @@ export default function Home() {
       <header className="mb-8 border-b border-gray-200 pb-6">
         <div className="inline-block w-full border-2 border-gray-900 rounded-sm relative px-8 py-5">
           <div className="flex items-baseline justify-between">
-            <span className="text-3xl font-black tracking-[0.12em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>政策市民シミュレーター</span>
+            <span className="text-3xl font-black tracking-[0.12em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
             <span className="text-xs tracking-[0.2em] text-gray-500 border-l border-gray-300 pl-5">SOCIAL SIMULACRA</span>
           </div>
           <div className="absolute inset-[3px] border border-gray-400 rounded-sm pointer-events-none" />

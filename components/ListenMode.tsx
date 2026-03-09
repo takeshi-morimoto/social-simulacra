@@ -33,7 +33,7 @@ export default function ListenMode({
 }: Props) {
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const shareText = `【${municipality}】「${policy}」を市民シミュレーション\n💪強く賛成${stanceCounts["強く賛成"]} 👍賛成${stanceCounts["賛成"]} 🤔条件付き${stanceCounts["条件付き賛成"]} 😐中立${stanceCounts["中立"]} 👎反対${stanceCounts["反対"]} 🚫強く反対${stanceCounts["強く反対"]}\n${analysis ? `支持率: ${analysis.approval_rate}% ${analysis.approval_rate >= 80 ? "🏆" : analysis.approval_rate >= 60 ? "🥈" : analysis.approval_rate >= 40 ? "⚖️" : "⚠️"}` : ""}\n#政策市民シミュレーター #SocialSimulacra`;
+  const shareText = `【${municipality}】「${policy}」を市民シミュレーション\n💪強く賛成${stanceCounts["強く賛成"]} 👍賛成${stanceCounts["賛成"]} 🤔条件付き${stanceCounts["条件付き賛成"]} 😐中立${stanceCounts["中立"]} 👎反対${stanceCounts["反対"]} 🚫強く反対${stanceCounts["強く反対"]}\n${analysis ? `支持率: ${analysis.approval_rate}% ${analysis.approval_rate >= 80 ? "🏆" : analysis.approval_rate >= 60 ? "🥈" : analysis.approval_rate >= 40 ? "⚖️" : "⚠️"}` : ""}\n#AI市長 #AI市長`;
 
   return (
     <>
@@ -48,7 +48,7 @@ export default function ListenMode({
           <div className="rounded-xl border-2 border-gray-900 bg-gradient-to-br from-gray-50 to-slate-100 p-6 mb-4 shadow-sm relative overflow-hidden">
             <div className="absolute inset-[4px] border border-gray-400 rounded-lg pointer-events-none" />
             <div className="flex items-baseline justify-between mb-4">
-              <span className="text-xl font-black tracking-[0.1em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>政策市民シミュレーター</span>
+              <span className="text-xl font-black tracking-[0.1em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
               <span className="text-[10px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SOCIAL SIMULACRA</span>
             </div>
             <div className="text-[11px] text-gray-400 mb-1">{municipality}</div>
