@@ -95,15 +95,17 @@ export default function Home() {
       const data: Record<string, PersonaResponse> = await res.json();
 
       for (const persona of personas) {
-        const r = data[String(persona.id)];
-        if (r) {
-          results[persona.id] = r;
-          setPersonaResults((prev) => ({ ...prev, [persona.id]: r }));
-          setStanceCounts((prev) => ({
-            ...prev,
-            [r.stance]: prev[r.stance as Stance] + 1,
-          }));
-        }
+        const r = data[String(persona.id)] ?? {
+          opinion: "（回答を取得できませんでした）",
+          stance: "中立" as Stance,
+          tags: ["未回答"],
+        };
+        results[persona.id] = r;
+        setPersonaResults((prev) => ({ ...prev, [persona.id]: r }));
+        setStanceCounts((prev) => ({
+          ...prev,
+          [r.stance]: prev[r.stance as Stance] + 1,
+        }));
       }
     } catch {
       for (const persona of personas) {
