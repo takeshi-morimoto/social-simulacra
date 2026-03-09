@@ -77,6 +77,8 @@ export default function ListenMode({
           mode="listen"
           stanceCounts={stanceCounts}
           analysis={analysis}
+          personas={personas}
+          personaResults={personaResults}
           visible={showAnalysis && !analysisLoading && !!analysis}
         />
       </div>

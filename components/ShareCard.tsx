@@ -1,6 +1,6 @@
 "use client";
 
-import type { StanceCounts, AnalysisResponse } from "@/lib/types";
+import type { Persona, PersonaResponse, StanceCounts, AnalysisResponse } from "@/lib/types";
 
 interface Props {
   municipality: string;
@@ -8,6 +8,8 @@ interface Props {
   mode: "listen" | "propose";
   stanceCounts?: StanceCounts;
   analysis?: AnalysisResponse | null;
+  personas?: Persona[];
+  personaResults?: Record<number, PersonaResponse | null>;
   visible: boolean;
 }
 
@@ -20,91 +22,122 @@ const STANCE_CONFIG = [
   { key: "強く反対" as const, emoji: "🚫", color: "#8B1A1A" },
 ];
 
-function getGrade(rate: number): { emoji: string; comment: string; color: string } {
-  if (rate >= 80) return { emoji: "🏆", comment: "素晴らしい政策です！市民から圧倒的な支持を得ています", color: "text-amber-700" };
-  if (rate >= 60) return { emoji: "🥈", comment: "良い政策です。多くの市民が前向きに評価しています", color: "text-slate-700" };
-  if (rate >= 40) return { emoji: "⚖️", comment: "賛否が分かれています。さらなる議論と改善が必要です", color: "text-orange-700" };
-  if (rate >= 20) return { emoji: "⚠️", comment: "支持が低い政策です。市民の声を聞いて見直しましょう", color: "text-red-600" };
-  return { emoji: "🚨", comment: "市民から強い反発があります。根本的な再検討が必要です", color: "text-red-800" };
+const PRO_STANCES = new Set(["強く賛成", "賛成", "条件付き賛成"]);
+const CON_STANCES = new Set(["反対", "強く反対"]);
+
+function getGrade(rate: number): { emoji: string; comment: string; color: string; bg: string; border: string } {
+  if (rate >= 80) return { emoji: "🏆", comment: "素晴らしい政策です！市民から圧倒的な支持を得ています", color: "text-amber-700", bg: "from-amber-50 to-yellow-50", border: "border-amber-300" };
+  if (rate >= 60) return { emoji: "🥈", comment: "良い政策です。多くの市民が前向きに評価しています", color: "text-slate-700", bg: "from-slate-50 to-gray-50", border: "border-slate-300" };
+  if (rate >= 40) return { emoji: "⚖️", comment: "賛否が分かれています。さらなる議論と改善が必要です", color: "text-orange-700", bg: "from-orange-50 to-amber-50", border: "border-orange-300" };
+  if (rate >= 20) return { emoji: "⚠️", comment: "支持が低い政策です。市民の声を聞いて見直しましょう", color: "text-red-600", bg: "from-red-50 to-orange-50", border: "border-red-300" };
+  return { emoji: "🚨", comment: "市民から強い反発があります。根本的な再検討が必要です", color: "text-red-800", bg: "from-red-100 to-red-50", border: "border-red-400" };
 }
 
-export default function ShareCard({ municipality, policy, mode, stanceCounts, analysis, visible }: Props) {
+function getRepresentativeOpinion(
+  personas: Persona[],
+  results: Record<number, PersonaResponse | null>,
+  stanceSet: Set<string>,
+): { persona: Persona; opinion: string } | null {
+  for (const p of personas) {
+    const r = results[p.id];
+    if (r && stanceSet.has(r.stance)) {
+      return { persona: p, opinion: r.opinion };
+    }
+  }
+  return null;
+}
+
+export default function ShareCard({ municipality, policy, mode, stanceCounts, analysis, personas, personaResults, visible }: Props) {
   if (!visible) return null;
 
   const total = stanceCounts ? Object.values(stanceCounts).reduce((a, b) => a + b, 0) : 0;
+  const proOpinion = personas && personaResults ? getRepresentativeOpinion(personas, personaResults, PRO_STANCES) : null;
+  const conOpinion = personas && personaResults ? getRepresentativeOpinion(personas, personaResults, CON_STANCES) : null;
 
   return (
-    <div
-      className="mb-6"
-      style={{ aspectRatio: "1200 / 630" }}
-    >
-      <div className="h-full rounded-xl border-2 border-gray-900 bg-gradient-to-br from-gray-50 via-white to-slate-100 p-6 shadow-lg relative overflow-hidden flex flex-col justify-between">
+    <div className="mb-6" style={{ aspectRatio: "1200 / 630" }}>
+      <div className="h-full rounded-xl border-2 border-gray-900 bg-gradient-to-br from-slate-50 via-white to-gray-100 shadow-lg relative overflow-hidden flex flex-col">
         {/* Inner border */}
-        <div className="absolute inset-[4px] border border-gray-400 rounded-lg pointer-events-none" />
+        <div className="absolute inset-[4px] border border-gray-300 rounded-lg pointer-events-none" />
 
-        {/* Top: Brand */}
-        <div>
-          <div className="flex items-baseline justify-between mb-4">
-            <span className="text-xl font-black tracking-[0.1em] text-black sm:text-2xl" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
-            <span className="text-[10px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SOCIAL SIMULACRA</span>
+        {/* Top: Brand + Policy */}
+        <div className="px-6 pt-5 pb-3">
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-sm font-black tracking-[0.1em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
+            <span className="text-[9px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SOCIAL SIMULACRA</span>
           </div>
-
-          {/* Policy info */}
-          <div className="mb-3">
-            <div className="text-[11px] text-gray-400 mb-0.5">{municipality}</div>
-            {mode === "listen" && policy && (
-              <div className="text-sm font-semibold text-gray-900 leading-6 line-clamp-2">「{policy}」</div>
-            )}
-            {mode === "propose" && (
-              <div className="text-sm font-semibold text-gray-900 leading-6">市民ペルソナによる政策立案</div>
-            )}
-          </div>
+          <div className="text-base font-bold text-gray-800 mb-0.5">{municipality}</div>
+          {mode === "listen" && policy && (
+            <div className="text-lg font-black text-gray-900 leading-7 line-clamp-2">「{policy}」</div>
+          )}
+          {mode === "propose" && (
+            <div className="text-lg font-black text-gray-900 leading-7">市民ペルソナによる政策立案</div>
+          )}
         </div>
 
-        {/* Middle: Results */}
-        {mode === "listen" && stanceCounts && total > 0 && (
-          <div className="flex-1 flex flex-col justify-center">
-            {/* Bar */}
-            <div className="flex h-4 overflow-hidden rounded-full mb-3">
-              {STANCE_CONFIG.map(({ key, color }) =>
-                stanceCounts[key] > 0 ? (
-                  <div key={key} className="transition-all duration-700" style={{ width: `${(stanceCounts[key] / total) * 100}%`, backgroundColor: color }} />
-                ) : null
-              )}
-            </div>
-
-            {/* Counts */}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
-              {STANCE_CONFIG.map(({ key, emoji, color }) =>
-                stanceCounts[key] > 0 ? (
-                  <span key={key} className="font-semibold" style={{ color }}>
-                    {emoji} {key} {stanceCounts[key]}
-                  </span>
-                ) : null
-              )}
-            </div>
-
-            {/* Approval rate + comment */}
-            {analysis && (() => {
-              const grade = getGrade(analysis.approval_rate);
-              return (
-                <div className="flex items-center gap-3 rounded-lg bg-white/60 border border-gray-200 px-4 py-3">
-                  <span className="text-4xl">{grade.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="text-2xl font-black text-gray-900">{analysis.approval_rate}%</span>
-                      <span className="text-[10px] text-gray-400">推定支持率</span>
-                    </div>
-                    <div className={`text-xs font-semibold leading-5 ${grade.color}`}>{grade.comment}</div>
+        {/* Middle: Approval rate + bar (centered) */}
+        {mode === "listen" && stanceCounts && total > 0 && analysis && (() => {
+          const grade = getGrade(analysis.approval_rate);
+          return (
+            <div className="flex-1 flex flex-col justify-center px-6">
+              {/* Approval rate */}
+              <div className={`flex items-center gap-3 rounded-xl bg-gradient-to-r ${grade.bg} border ${grade.border} px-4 py-3 mb-3`}>
+                <span className="text-4xl">{grade.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className="text-3xl font-black text-gray-900">{analysis.approval_rate}%</span>
+                    <span className="text-[10px] text-gray-400 font-medium">推定支持率</span>
                   </div>
+                  <div className={`text-xs font-bold leading-5 ${grade.color}`}>{grade.comment}</div>
                 </div>
-              );
-            })()}
-          </div>
-        )}
+              </div>
+
+              {/* Stance bar */}
+              <div className="flex h-3 overflow-hidden rounded-full mb-2">
+                {STANCE_CONFIG.map(({ key, color }) =>
+                  stanceCounts[key] > 0 ? (
+                    <div key={key} style={{ width: `${(stanceCounts[key] / total) * 100}%`, backgroundColor: color }} />
+                  ) : null
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] mb-3">
+                {STANCE_CONFIG.map(({ key, emoji, color }) =>
+                  stanceCounts[key] > 0 ? (
+                    <span key={key} className="font-semibold" style={{ color }}>{emoji}{key} {stanceCounts[key]}</span>
+                  ) : null
+                )}
+              </div>
+
+              {/* Representative opinions */}
+              <div className="grid grid-cols-2 gap-2">
+                {proOpinion && (
+                  <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-sm">👍</span>
+                      <span className="text-[10px] font-bold text-green-800">賛成の声</span>
+                    </div>
+                    <div className="text-[10px] text-green-900 leading-4 line-clamp-2">「{proOpinion.opinion}」</div>
+                    <div className="text-[9px] text-green-600 mt-0.5">— {proOpinion.persona.name}（{proOpinion.persona.role}）</div>
+                  </div>
+                )}
+                {conOpinion && (
+                  <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-sm">👎</span>
+                      <span className="text-[10px] font-bold text-red-800">反対の声</span>
+                    </div>
+                    <div className="text-[10px] text-red-900 leading-4 line-clamp-2">「{conOpinion.opinion}」</div>
+                    <div className="text-[9px] text-red-600 mt-0.5">— {conOpinion.persona.name}（{conOpinion.persona.role}）</div>
+                  </div>
+                )}
+                {!proOpinion && !conOpinion && <div />}
+              </div>
+            </div>
+          );
+        })()}
 
         {mode === "propose" && (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center px-6">
             <div className="text-center">
               <div className="text-4xl mb-2">🏛️</div>
               <div className="text-sm text-gray-600">15人の市民ペルソナが政策を提案しました</div>
@@ -113,9 +146,9 @@ export default function ShareCard({ municipality, policy, mode, stanceCounts, an
         )}
 
         {/* Bottom: Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <span className="text-[10px] text-gray-400">Produced by KOIKOI, Inc.</span>
-          <div className="flex gap-2 text-lg">
+        <div className="flex items-center justify-between px-6 pb-3 pt-1">
+          <span className="text-[9px] text-gray-400">Produced by KOIKOI, Inc.</span>
+          <div className="flex gap-1.5 text-base">
             <span>👵</span><span>🧑‍💼</span><span>👩‍💻</span><span>👨‍👩‍👧</span><span>🎓</span><span>👴</span>
           </div>
         </div>
