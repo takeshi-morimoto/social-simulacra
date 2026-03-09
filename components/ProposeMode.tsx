@@ -4,6 +4,7 @@ import { useRef } from "react";
 import type { Persona, PolicyProposal } from "@/lib/types";
 import ProposalCard from "@/components/ProposalCard";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ShareCard from "@/components/ShareCard";
 import ShareButtons from "@/components/ShareButtons";
 
 interface Props {
@@ -19,7 +20,7 @@ export default function ProposeMode({
   municipality, personas, proposals,
   isProposing, hasProposed, onRunProposals,
 }: Props) {
-  const resultsRef = useRef<HTMLDivElement>(null);
+  const shareCardRef = useRef<HTMLDivElement>(null);
 
   return (
     <>
@@ -45,16 +46,6 @@ export default function ProposeMode({
 
       {hasProposed && !isProposing && (
         <>
-          <div ref={resultsRef}>
-            <div className="rounded-xl border-2 border-gray-900 bg-gradient-to-br from-gray-50 to-slate-100 p-6 mb-4 shadow-sm relative overflow-hidden">
-              <div className="absolute inset-[4px] border border-gray-400 rounded-lg pointer-events-none" />
-              <div className="flex items-baseline justify-between mb-4">
-                <span className="text-xl font-black tracking-[0.1em] text-black" style={{ fontFamily: "'Noto Serif JP', serif" }}>AI市長</span>
-                <span className="text-[10px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SOCIAL SIMULACRA</span>
-              </div>
-              <div className="text-[11px] text-gray-400 mb-1">{municipality}</div>
-              <div className="text-sm font-semibold text-gray-900 leading-6">市民ペルソナによる政策立案</div>
-            </div>
           <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {personas.map((persona) => (
               <ProposalCard
@@ -65,10 +56,18 @@ export default function ProposeMode({
               />
             ))}
           </div>
+
+          <div ref={shareCardRef}>
+            <ShareCard
+              municipality={municipality}
+              mode="propose"
+              visible={true}
+            />
           </div>
+
           <ShareButtons
-            captureRef={resultsRef}
-            shareText={`【${municipality}】市民ペルソナが自ら政策を立案しました\n#AI市長 #AI市長`}
+            captureRef={shareCardRef}
+            shareText={`【${municipality}】市民ペルソナが自ら政策を立案しました\n#AI市長 #SocialSimulacra`}
           />
         </>
       )}
