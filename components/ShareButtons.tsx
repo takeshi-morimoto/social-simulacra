@@ -4,9 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 
 interface Props {
-  /** ref to the DOM element to capture */
   captureRef: React.RefObject<HTMLElement | null>;
-  /** summary text for share links */
   shareText: string;
 }
 
@@ -26,7 +24,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
         pixelRatio: 2,
         skipFonts: true,
         filter: (node: HTMLElement) => {
-          // Skip external link stylesheets that cause CORS errors
           if (node.tagName === "LINK" && (node as HTMLLinkElement).rel === "stylesheet") {
             return false;
           }
@@ -47,19 +44,19 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
     if (!blob || !linkRef.current) return;
     const url = URL.createObjectURL(blob);
     linkRef.current.href = url;
-    linkRef.current.download = "simulation-result.png";
+    linkRef.current.download = "sanbo-ai-result.png";
     linkRef.current.click();
     URL.revokeObjectURL(url);
   }, [captureImage]);
 
   const handleWebShare = useCallback(async () => {
     const blob = await captureImage();
-    const files = blob ? [new File([blob], "simulation-result.png", { type: "image/png" })] : [];
+    const files = blob ? [new File([blob], "sanbo-ai-result.png", { type: "image/png" })] : [];
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "政策市民シミュレーター",
+          title: "参謀AI - 選挙シミュレーター",
           text: shareText,
           url: siteUrl,
           ...(files.length && navigator.canShare?.({ files }) ? { files } : {}),
@@ -76,7 +73,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm mb-6">
       <div className="text-xs font-semibold text-gray-500 mb-3">結果をシェア</div>
       <div className="flex flex-wrap gap-2">
-        {/* Download image */}
         <button
           onClick={handleDownload}
           disabled={isCapturing}
@@ -88,7 +84,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           {isCapturing ? "キャプチャ中..." : "画像として保存"}
         </button>
 
-        {/* Twitter/X */}
         <a
           href={`https://twitter.com/intent/tweet?text=${encoded}`}
           target="_blank"
@@ -101,7 +96,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           X (Twitter)
         </a>
 
-        {/* Facebook */}
         <a
           href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}&quote=${encodeURIComponent(shareText)}`}
           target="_blank"
@@ -114,7 +108,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           Facebook
         </a>
 
-        {/* LINE */}
         <a
           href={`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`}
           target="_blank"
@@ -127,7 +120,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
           LINE
         </a>
 
-        {/* Web Share API (mobile) */}
         {supportsWebShare && (
           <button
             onClick={handleWebShare}
@@ -142,7 +134,6 @@ export default function ShareButtons({ captureRef, shareText }: Props) {
         )}
       </div>
 
-      {/* hidden download link */}
       <a ref={linkRef} className="hidden" />
     </div>
   );

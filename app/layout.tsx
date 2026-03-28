@@ -3,19 +3,19 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI市長｜Social Simulacra",
-  description: "自治体を選び、政策を入力すると、AIが生成した市民ペルソナが反応します。人口動態に基づくリアルな市民の声をシミュレーション。",
+  title: "参謀AI｜選挙シミュレーター",
+  description: "選挙区を選び、公約を入力すると、AIが生成した有権者ペルソナが反応します。投票率加重による支持率分析で選挙戦略を支援。",
   openGraph: {
-    title: "AI市長｜Social Simulacra",
-    description: "AIが生成した市民ペルソナが政策に反応。自治体の人口動態に基づくリアルな市民シミュレーション。",
+    title: "参謀AI｜選挙シミュレーター",
+    description: "AIが生成した有権者ペルソナが公約に反応。投票率加重による支持率分析で選挙戦略を支援。",
     type: "website",
     locale: "ja_JP",
-    siteName: "Social Simulacra",
+    siteName: "参謀AI",
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI市長｜Social Simulacra",
-    description: "AIが生成した市民ペルソナが政策に反応。自治体の人口動態に基づくリアルな市民シミュレーション。",
+    title: "参謀AI｜選挙シミュレーター",
+    description: "AIが生成した有権者ペルソナが公約に反応。投票率加重による支持率分析で選挙戦略を支援。",
   },
 };
 

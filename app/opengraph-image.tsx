@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "AI市長｜Social Simulacra";
+export const alt = "参謀AI｜選挙シミュレーター";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -16,13 +16,13 @@ export default async function Image() {
           position: "relative",
           overflow: "hidden",
           fontFamily: "sans-serif",
-          background: "#0f172a",
+          background: "#1B2A4A",
         }}
       >
         {/* Background gradient circles */}
-        <div style={{ position: "absolute", top: -120, right: -80, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(26,115,181,0.3) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -120, right: -80, width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(196,160,0,0.3) 0%, transparent 70%)" }} />
         <div style={{ position: "absolute", bottom: -100, left: -60, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(43,138,110,0.25) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: 100, left: 300, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(212,133,10,0.15) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: 100, left: 300, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(196,160,0,0.15) 0%, transparent 70%)" }} />
 
         {/* Content */}
         <div
@@ -53,23 +53,23 @@ export default async function Image() {
                   lineHeight: 1.1,
                 }}
               >
-                AI市長
+                参謀AI
               </div>
               <div
                 style={{
                   fontSize: 20,
-                  color: "#64748b",
+                  color: "#C4A000",
                   letterSpacing: "0.25em",
                   marginTop: 12,
                 }}
               >
-                SOCIAL SIMULACRA
+                SANBO AI
               </div>
               <div
                 style={{
                   width: 80,
                   height: 4,
-                  background: "linear-gradient(90deg, #1A73B5, #2B8A6E)",
+                  background: "linear-gradient(90deg, #C4A000, #2B8A6E)",
                   borderRadius: 2,
                   marginTop: 20,
                 }}
@@ -85,9 +85,9 @@ export default async function Image() {
                 maxWidth: 480,
               }}
             >
-              AIが生成した市民ペルソナが
+              AIが生成した有権者ペルソナが
               <br />
-              あなたの政策に反応する
+              あなたの公約に反応する
             </div>
 
             {/* Stance bar */}
@@ -165,7 +165,7 @@ export default async function Image() {
           }}
         >
           <span style={{ fontSize: 14, color: "#475569" }}>Produced by KOIKOI, Inc.</span>
-          <span style={{ fontSize: 14, color: "#475569" }}>ai-mayor.vercel.app</span>
+          <span style={{ fontSize: 14, color: "#C4A000" }}>選挙シミュレーター</span>
         </div>
       </div>
     ),

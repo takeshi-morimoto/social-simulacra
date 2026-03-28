@@ -1,14 +1,14 @@
 "use client";
 
-import type { Persona, PersonaResponse } from "@/lib/types";
+import type { VoterPersona, PersonaResponse } from "@/lib/types";
 
 interface Props {
-  persona: Persona;
+  persona: VoterPersona;
   response: PersonaResponse | null;
   isLoading: boolean;
 }
 
-function CardHeader({ persona }: { persona: Persona }) {
+function CardHeader({ persona }: { persona: VoterPersona }) {
   return (
     <div className="flex items-center gap-3 mb-3">
       <div
@@ -20,7 +20,7 @@ function CardHeader({ persona }: { persona: Persona }) {
       <div className="min-w-0">
         <div className="text-sm font-semibold text-gray-900 truncate">{persona.name}</div>
         <div className="text-[11px] text-gray-500">
-          {persona.age}歳 · {persona.role}
+          {persona.age}歳 · {persona.gender} · {persona.role}
         </div>
       </div>
     </div>
@@ -51,6 +51,8 @@ export default function PersonaCard({ persona, response, isLoading }: Props) {
     ? { borderColor: stanceColor, borderWidth: "2px" }
     : {};
 
+  const weightPercent = Math.round((persona.voterTurnoutWeight ?? 0.5) * 100);
+
   return (
     <div
       className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm min-h-[160px] transition-all${response ? " animate-fade-in" : ""}`}
@@ -58,12 +60,18 @@ export default function PersonaCard({ persona, response, isLoading }: Props) {
     >
       <div className="flex items-start justify-between">
         <CardHeader persona={persona} />
-        {badge && (
-          <div className={`shrink-0 flex items-center gap-1 rounded-full ${badge.bg} ${badge.border} border px-2.5 py-1`}>
-            <span className="text-sm">{badge.emoji}</span>
-            <span className={`text-[11px] font-bold ${badge.text}`}>{response!.stance}</span>
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          {badge && (
+            <div className={`flex items-center gap-1 rounded-full ${badge.bg} ${badge.border} border px-2.5 py-1`}>
+              <span className="text-sm">{badge.emoji}</span>
+              <span className={`text-[11px] font-bold ${badge.text}`}>{response!.stance}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5">
+            <span className="text-[9px] text-slate-500">投票率</span>
+            <span className="text-[10px] font-bold text-slate-700">{weightPercent}%</span>
           </div>
-        )}
+        </div>
       </div>
 
       {isLoading && (

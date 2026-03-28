@@ -5,6 +5,8 @@ import type { StanceCounts } from "@/lib/types";
 interface Props {
   counts: StanceCounts;
   approvalRate?: number;
+  weightedApprovalRate?: number;
+  rawApprovalRate?: number;
   visible: boolean;
 }
 
@@ -35,17 +37,11 @@ const STANCE_BAR_CONFIG: { key: keyof StanceCounts; color: string; label: string
   { key: "強く反対", color: "#8B1A1A", label: "強く反対" },
 ];
 
-function getStanceGrade(counts: StanceCounts): Grade {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  if (total === 0) return getGrade(50);
-  const rate = ((counts["強く賛成"] + counts["賛成"] + counts["条件付き賛成"] * 0.5) / total) * 100;
-  return getGrade(rate);
-}
-
-export default function PolicyBadge({ counts, approvalRate, visible }: Props) {
+export default function PolicyBadge({ counts, approvalRate, weightedApprovalRate, rawApprovalRate, visible }: Props) {
   if (!visible) return null;
 
-  const grade = approvalRate != null ? getGrade(approvalRate) : getStanceGrade(counts);
+  const effectiveRate = weightedApprovalRate ?? approvalRate;
+  const grade = effectiveRate != null ? getGrade(effectiveRate) : getGrade(50);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
@@ -75,10 +71,16 @@ export default function PolicyBadge({ counts, approvalRate, visible }: Props) {
                 <span key={key} className="font-semibold" style={{ color }}>{label} {counts[key]}</span>
               ) : null
             )}
-            {approvalRate != null && (
-              <span className={`font-bold ${grade.text} ml-auto`}>支持率 {approvalRate}%</span>
-            )}
           </div>
+
+          {effectiveRate != null && (
+            <div className="mt-2 flex items-center gap-3">
+              <span className={`font-bold ${grade.text}`}>加重支持率 {effectiveRate}%</span>
+              {rawApprovalRate != null && rawApprovalRate !== effectiveRate && (
+                <span className="text-xs text-gray-400">（生の支持率 {rawApprovalRate}%）</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

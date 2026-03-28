@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef } from "react";
-import type { Persona, PersonaResponse, AnalysisResponse, StanceCounts } from "@/lib/types";
+import { useRef, useMemo } from "react";
+import type { VoterPersona, PersonaResponse, ElectionAnalysisResponse, StanceCounts, AgeGroupFilter, CandidateProfile } from "@/lib/types";
 import PolicyInput from "@/components/PolicyInput";
-
+import CustomDataInput from "@/components/CustomDataInput";
+import AgeFilter from "@/components/AgeFilter";
 import PersonaCard from "@/components/PersonaCard";
-
 import AnalysisReport from "@/components/AnalysisReport";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ShareCard from "@/components/ShareCard";
@@ -17,49 +17,82 @@ interface Props {
   onPolicyChange: (v: string) => void;
   onRun: () => void;
   isRunning: boolean;
-  personas: Persona[];
+  personas: VoterPersona[];
   personaResults: Record<number, PersonaResponse | null>;
   loadingPersonas: Set<number>;
   stanceCounts: StanceCounts;
   showStanceBar: boolean;
-  analysis: AnalysisResponse | null;
+  analysis: ElectionAnalysisResponse | null;
   analysisLoading: boolean;
   showAnalysis: boolean;
+  customData: string;
+  onCustomDataChange: (v: string) => void;
+  candidateProfile: CandidateProfile;
+  ageFilter: AgeGroupFilter;
+  onAgeFilterChange: (v: AgeGroupFilter) => void;
 }
+
+const INITIAL_COUNTS: StanceCounts = { "強く賛成": 0, "賛成": 0, "条件付き賛成": 0, "中立": 0, "反対": 0, "強く反対": 0 };
 
 export default function ListenMode({
   municipality, policy, onPolicyChange, onRun, isRunning,
   personas, personaResults, loadingPersonas,
   stanceCounts, showStanceBar,
   analysis, analysisLoading, showAnalysis,
+  customData, onCustomDataChange,
+  ageFilter, onAgeFilterChange,
 }: Props) {
   const shareCardRef = useRef<HTMLDivElement>(null);
 
-  const shareText = `【${municipality}】「${policy}」\n${analysis?.share_comment ?? ""}\n支持率: ${analysis?.approval_rate ?? 0}%\n#AI市長 #SocialSimulacra`;
+  const displayRate = analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0;
+  const shareText = `【${municipality}】「${policy}」\n${analysis?.share_comment ?? ""}\n加重支持率: ${displayRate}%\n#参謀AI #SanboAI`;
+
+  // Client-side age filtering
+  const filteredPersonas = useMemo(() => {
+    if (ageFilter === "all") return personas;
+    return personas.filter((p) => p.ageGroup === ageFilter);
+  }, [personas, ageFilter]);
+
+  const filteredStanceCounts = useMemo(() => {
+    if (ageFilter === "all") return stanceCounts;
+    const counts = { ...INITIAL_COUNTS };
+    for (const p of filteredPersonas) {
+      const r = personaResults[p.id];
+      if (r) {
+        counts[r.stance] = (counts[r.stance] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [ageFilter, filteredPersonas, personaResults, stanceCounts]);
 
   return (
     <>
       <PolicyInput policy={policy} onPolicyChange={onPolicyChange} onRun={onRun} isRunning={isRunning} />
+      <CustomDataInput value={customData} onChange={onCustomDataChange} />
 
       {isRunning && !showStanceBar && (
-        <LoadingOverlay message="市民の反応をシミュレーション中..." estimateSeconds={10} />
+        <LoadingOverlay message="有権者の反応をシミュレーション中..." estimateSeconds={10} />
       )}
 
       {(showStanceBar || loadingPersonas.size > 0) && (
-        <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {personas.map((persona) => (
-            <PersonaCard
-              key={persona.id}
-              persona={persona}
-              response={personaResults[persona.id] ?? null}
-              isLoading={loadingPersonas.has(persona.id)}
-            />
-          ))}
-        </div>
+        <>
+          <AgeFilter value={ageFilter} onChange={onAgeFilterChange} />
+
+          <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredPersonas.map((persona) => (
+              <PersonaCard
+                key={persona.id}
+                persona={persona}
+                response={personaResults[persona.id] ?? null}
+                isLoading={loadingPersonas.has(persona.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {analysisLoading && (
-        <LoadingOverlay message="アナリシスレポートを生成中..." estimateSeconds={8} />
+        <LoadingOverlay message="選挙戦略レポートを生成中..." estimateSeconds={8} />
       )}
 
       <AnalysisReport analysis={analysis} isLoading={false} visible={showAnalysis && !analysisLoading} />
@@ -68,10 +101,9 @@ export default function ListenMode({
         <ShareCard
           municipality={municipality}
           policy={policy}
-          mode="listen"
-          stanceCounts={stanceCounts}
+          stanceCounts={filteredStanceCounts}
           analysis={analysis}
-          personas={personas}
+          personas={filteredPersonas}
           personaResults={personaResults}
           visible={showAnalysis && !analysisLoading && !!analysis}
         />

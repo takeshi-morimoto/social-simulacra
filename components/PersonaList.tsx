@@ -1,15 +1,15 @@
 "use client";
 
-import type { Persona } from "@/lib/types";
+import type { VoterPersona } from "@/lib/types";
 
 interface Props {
-  personas: Persona[];
+  personas: VoterPersona[];
 }
 
 export default function PersonaList({ personas }: Props) {
   return (
     <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-xs font-semibold text-gray-500">生成されたペルソナ（{personas.length}人）</div>
+      <div className="mb-3 text-xs font-semibold text-gray-500">生成された有権者ペルソナ（{personas.length}人）</div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {personas.map((p) => (
           <div key={p.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -20,9 +20,12 @@ export default function PersonaList({ personas }: Props) {
               >
                 {p.icon}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-[12px] font-semibold text-gray-800 truncate">{p.name}</div>
-                <div className="text-[10px] text-gray-500">{p.age}歳 · {p.role}</div>
+                <div className="text-[10px] text-gray-500">{p.age}歳 · {p.gender} · {p.role}</div>
+              </div>
+              <div className="shrink-0 rounded-full bg-slate-100 border border-slate-200 px-1.5 py-0.5">
+                <span className="text-[9px] text-slate-600 font-medium">投票率 {Math.round((p.voterTurnoutWeight ?? 0.5) * 100)}%</span>
               </div>
             </div>
             <div className="text-[11px] text-gray-600 leading-[1.6] mb-1.5">{p.detail}</div>

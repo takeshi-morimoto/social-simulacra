@@ -1,10 +1,10 @@
 "use client";
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import type { DemographicProfile, ChartSegment } from "@/lib/types";
+import type { ElectionDemographicProfile, ChartSegment } from "@/lib/types";
 
 interface Props {
-  demographics: DemographicProfile;
+  demographics: ElectionDemographicProfile;
   municipality: string;
 }
 
@@ -61,6 +61,10 @@ export default function DemographicsPanel({ demographics, municipality }: Props)
           <div className="text-sm font-semibold text-gray-800">{demographics.population}</div>
         </div>
         <div className="rounded-md bg-gray-50 px-3 py-2">
+          <div className="text-[10px] text-gray-400">有権者数</div>
+          <div className="text-sm font-semibold text-[#1B2A4A]">{demographics.voter_population || "—"}</div>
+        </div>
+        <div className="rounded-md bg-gray-50 px-3 py-2">
           <div className="text-[10px] text-gray-400">高齢化率</div>
           <div className="text-sm font-semibold text-gray-800">{demographics.aging_rate}</div>
         </div>
@@ -68,15 +72,31 @@ export default function DemographicsPanel({ demographics, municipality }: Props)
           <div className="text-[10px] text-gray-400">外国人比率</div>
           <div className="text-sm font-semibold text-gray-800">{demographics.foreign_rate}</div>
         </div>
-        <div className="rounded-md bg-gray-50 px-3 py-2">
-          <div className="text-[10px] text-gray-400">世帯の特徴</div>
-          <div className="text-sm font-semibold text-gray-800">{demographics.household_features}</div>
-        </div>
       </div>
+
+      {/* Voter Turnout Rates */}
+      {demographics.voter_turnout_rates && demographics.voter_turnout_rates.length > 0 && (
+        <div className="mb-5">
+          <div className="text-[11px] font-semibold text-gray-500 mb-2">年代別推定投票率</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {demographics.voter_turnout_rates.map((rate) => (
+              <div key={rate.ageGroup} className="rounded-md bg-slate-50 border border-slate-100 px-3 py-2">
+                <div className="text-[10px] text-slate-500 mb-1">{rate.ageGroup}</div>
+                <div className="text-sm font-bold text-[#1B2A4A]">{rate.overall}%</div>
+                <div className="text-[9px] text-slate-400">男{rate.male}% / 女{rate.female}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pie Charts */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-5">
-        <MiniPieChart data={demographics.age_distribution} colors={AGE_COLORS} title="年齢構成" />
+        <MiniPieChart
+          data={demographics.voter_age_distribution || demographics.age_distribution}
+          colors={AGE_COLORS}
+          title="有権者年齢構成"
+        />
         <MiniPieChart data={demographics.gender_distribution} colors={GENDER_COLORS} title="性別構成" />
         <MiniPieChart data={demographics.industry_distribution} colors={INDUSTRY_COLORS} title="産業構成" />
       </div>

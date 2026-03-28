@@ -13,6 +13,12 @@ export interface Persona {
   concern: string;
 }
 
+export interface VoterPersona extends Persona {
+  gender: string;
+  voterTurnoutWeight: number;
+  ageGroup: string;
+}
+
 export interface PersonaResponse {
   opinion: string;
   stance: Stance;
@@ -25,6 +31,20 @@ export interface AnalysisResponse {
   recommendations: string[];
   approval_rate: number;
   share_comment: string;
+}
+
+export interface ElectionAnalysisResponse extends AnalysisResponse {
+  raw_approval_rate: number;
+  weighted_approval_rate: number;
+  age_group_breakdown: AgeGroupResult[];
+}
+
+export interface AgeGroupResult {
+  ageGroup: string;
+  count: number;
+  approval_rate: number;
+  weighted_approval_rate: number;
+  stanceCounts: StanceCounts;
 }
 
 export type StanceCounts = Record<Stance, number>;
@@ -46,10 +66,28 @@ export interface DemographicProfile {
   industry_distribution: ChartSegment[];
 }
 
-export interface PolicyProposal {
-  title: string;
-  description: string;
-  reason: string;
+export interface VoterTurnoutRate {
+  ageGroup: string;
+  male: number;
+  female: number;
+  overall: number;
 }
 
-export type ProposalResults = Record<number, PolicyProposal>;
+export interface ElectionDemographicProfile extends DemographicProfile {
+  voter_population: string;
+  voter_turnout_rates: VoterTurnoutRate[];
+  voter_age_distribution: ChartSegment[];
+}
+
+export interface CandidateProfile {
+  name: string;
+  party: string;
+  district: string;
+  platform: string;
+}
+
+export interface CustomData {
+  text: string;
+}
+
+export type AgeGroupFilter = "all" | "18〜29歳" | "30〜44歳" | "45〜64歳" | "65歳以上";
