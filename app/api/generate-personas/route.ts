@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAnthropic } from "@/lib/anthropic";
 import type { VoterPersona, ElectionDemographicProfile, VoterTurnoutRate } from "@/lib/types";
+import { getDemographicsForMunicipality } from "@/lib/estat";
 
 const ICONS = ["👵", "👴", "🧑‍💼", "👩", "🧑", "👨‍👩‍👧", "👩‍💻", "🧑‍🔧", "🎓", "👩‍👦", "💼", "🤝", "🚕", "👷", "👩‍🍳"];
 const COLORS = ["#E8A87C", "#7EC8A8", "#7BA7D4", "#B07ED4", "#D4A87E", "#E07EA0", "#8B9DC3", "#D4A0C0", "#E0A070", "#5B8FA8", "#C9A0A0", "#A0C4A0", "#C8A8D8", "#7EB8A0", "#D4C87E"];
@@ -45,6 +46,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing municipality" }, { status: 400 });
   }
 
+  // e-Stat APIから実際の人口統計データを取得
+  const estatData = await getDemographicsForMunicipality(municipality);
+
+  const estatContext = estatData
+    ? `\n\n【e-Stat国勢調査データ（2020年）- 必ずこのデータに基づいて生成すること】
+地域名: ${estatData.name}
+総人口: ${estatData.totalPopulation.toLocaleString()}人
+男性: ${estatData.malePopulation.toLocaleString()}人 / 女性: ${estatData.femalePopulation.toLocaleString()}人
+高齢化率: ${estatData.agingRate}%
+年齢分布:
+${estatData.ageDistribution.map((a) => `  ${a.name}: ${a.value}%（${a.count.toLocaleString()}人）`).join("\n")}
+
+※上記は国勢調査の実データです。demographicsのage_distributionやgender_distributionはこのデータを正確に反映してください。
+※ペルソナの年齢・性別配分もこの実データの比率に忠実に従ってください。`
+    : "";
+
   const candidateContext = candidateProfile
     ? `\n\n【候補者情報（参考）】\n候補者名: ${candidateProfile.name}\n所属政党: ${candidateProfile.party}\n選挙区: ${candidateProfile.district}\n公約概要: ${candidateProfile.platform}`
     : "";
@@ -73,7 +90,7 @@ export async function POST(req: NextRequest) {
 
 【投票率データ】
 - voter_turnout_ratesには、その自治体が属する地域（都道府県）の直近の選挙データに基づく年代別・性別別の推定投票率を設定してください
-- 一般的な傾向：若年層(18-29歳)は30-40%、中年層(30-44歳)は45-55%、壮年層(45-64歳)は60-70%、高齢層(65歳以上)は65-75%${candidateContext}
+- 一般的な傾向：若年層(18-29歳)は30-40%、中年層(30-44歳)は45-55%、壮年層(45-64歳)は60-70%、高齢層(65歳以上)は65-75%${estatContext}${candidateContext}
 
 必ず以下のJSON形式のみで回答してください：
 {
