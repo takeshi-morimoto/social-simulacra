@@ -189,9 +189,202 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
 }
 
 /**
+ * 衆議院小選挙区の構成市区町村を特定する
+ * AIに構成市区町村を聞く代わりに、e-Statのメタ情報から都道府県内の全市区町村を取得し、
+ * 選挙区GeoJSONと照合して特定する
+ */
+async function findDistrictMunicipalities(municipalityName: string): Promise<{ code: string; name: string }[]> {
+  const prefCode = extractPrefCodeShort(municipalityName);
+  if (!prefCode) return [];
+
+  const districtNum = municipalityName.match(/第(\d+)区/)?.[1];
+  if (!districtNum) return [];
+
+  const prefName = extractPrefName(municipalityName) || "";
+
+  try {
+    // 選挙区GeoJSONを取得して、該当選挙区のポリゴン中心点を取得
+    const geoRes = await fetch(
+      `https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/constituency/geojson/s0001/senkyoku289polygon_${prefCode}.json`
+    );
+    if (!geoRes.ok) return [];
+    const geoData = await geoRes.json();
+
+    const districtFeature = geoData.features.find(
+      (f: GeoJSON.Feature) => f.properties?.ku === parseInt(districtNum)
+    );
+    if (!districtFeature) return [];
+
+    // 市区町村GeoJSONを取得
+    const muniRes = await fetch(
+      `https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010/N03-21_${prefCode}_210101.json`
+    );
+    if (!muniRes.ok) return [];
+    const muniData = await muniRes.json();
+
+    // 選挙区ポリゴンの重心を計算する簡易関数
+    function getCentroid(coords: number[][]): [number, number] {
+      let latSum = 0, lngSum = 0;
+      for (const [lng, lat] of coords) { latSum += lat; lngSum += lng; }
+      return [latSum / coords.length, lngSum / coords.length];
+    }
+
+    // 選挙区ポリゴンのバウンディングボックスを取得
+    function getBBox(geometry: GeoJSON.Geometry): [number, number, number, number] {
+      let minLng = 999, minLat = 999, maxLng = -999, maxLat = -999;
+      function processCoords(coords: unknown) {
+        if (typeof coords === "number") return;
+        if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === "number") {
+          const [lng, lat] = coords as [number, number];
+          minLng = Math.min(minLng, lng); maxLng = Math.max(maxLng, lng);
+          minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+          return;
+        }
+        if (Array.isArray(coords)) coords.forEach(processCoords);
+      }
+      if ("coordinates" in geometry) processCoords(geometry.coordinates);
+      return [minLng, minLat, maxLng, maxLat];
+    }
+
+    // 点がバウンディングボックス内にあるか
+    function inBBox(lat: number, lng: number, bbox: [number, number, number, number]): boolean {
+      return lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3];
+    }
+
+    const districtBBox = getBBox(districtFeature.geometry);
+    // バウンディングボックスを少し拡大して含まれる市区町村を特定
+    const expandedBBox: [number, number, number, number] = [
+      districtBBox[0] - 0.01, districtBBox[1] - 0.01,
+      districtBBox[2] + 0.01, districtBBox[3] + 0.01,
+    ];
+
+    // 各市区町村の重心が選挙区バウンディングボックス内にあるか判定
+    const municipalities: { code: string; name: string }[] = [];
+    const seen = new Set<string>();
+
+    for (const feature of muniData.features) {
+      const code = feature.properties?.N03_007;
+      const name = feature.properties?.N03_004 || feature.properties?.N03_003 || "";
+      if (!code || !name || seen.has(code)) continue;
+
+      // 市区町村ポリゴンの重心
+      let coords: number[][] = [];
+      const geom = feature.geometry;
+      if (geom.type === "Polygon") {
+        coords = geom.coordinates[0];
+      } else if (geom.type === "MultiPolygon") {
+        coords = geom.coordinates[0][0];
+      }
+      if (coords.length === 0) continue;
+
+      const [lat, lng] = getCentroid(coords);
+      if (inBBox(lat, lng, expandedBBox)) {
+        // さらに精密に: 選挙区ポリゴンのバウンディングボックスで絞り込み
+        // (完全なポリゴン判定は重いので、BBox近似で十分)
+        if (inBBox(lat, lng, districtBBox)) {
+          municipalities.push({ code, name });
+          seen.add(code);
+        }
+      }
+    }
+
+    return municipalities;
+  } catch (e) {
+    console.error("findDistrictMunicipalities error:", e);
+    return [];
+  }
+}
+
+/**
+ * 複数市区町村の人口データを集約
+ */
+async function fetchAggregatedDemographics(
+  areaCodes: { code: string; name: string }[],
+  districtName: string,
+): Promise<MunicipalityDemographics | null> {
+  if (areaCodes.length === 0) return null;
+
+  const codes = areaCodes.map((a) => a.code).join(",");
+  const url = `${ESTAT_BASE}/getStatsData?appId=${APP_ID}&statsDataId=${CENSUS_STATS_ID}&cdArea=${codes}&cdCat01=0&limit=10000`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const values: EStatValue[] = data.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF?.VALUE;
+    if (!values?.length) return null;
+
+    let totalPopulation = 0, malePopulation = 0, femalePopulation = 0;
+    const ageCounts: Record<string, number> = {
+      "0〜14歳": 0, "15〜29歳": 0, "30〜44歳": 0, "45〜64歳": 0, "65歳以上": 0,
+    };
+
+    // 各市区町村の総人口を合算
+    for (const areaCode of areaCodes.map((a) => a.code)) {
+      const areaValues = values.filter((v) => v["@area"] === areaCode);
+
+      const total = areaValues.find((v) => v["@cat02"] === "0" && v["@cat03"] === "000");
+      const male = areaValues.find((v) => v["@cat02"] === "1" && v["@cat03"] === "000");
+      const female = areaValues.find((v) => v["@cat02"] === "2" && v["@cat03"] === "000");
+
+      totalPopulation += parseInt(total?.$ || "0") || 0;
+      malePopulation += parseInt(male?.$ || "0") || 0;
+      femalePopulation += parseInt(female?.$ || "0") || 0;
+
+      // 年齢別集計
+      const ageData = areaValues.filter((v) => v["@cat02"] === "0" && v["@cat03"] !== "000");
+      for (const v of ageData) {
+        const ageCode = parseInt(v["@cat03"]);
+        const age = ageCode - 1;
+        const count = parseInt(v.$) || 0;
+        if (age < 0 || isNaN(age)) continue;
+        if (age <= 14) ageCounts["0〜14歳"] += count;
+        else if (age <= 29) ageCounts["15〜29歳"] += count;
+        else if (age <= 44) ageCounts["30〜44歳"] += count;
+        else if (age <= 64) ageCounts["45〜64歳"] += count;
+        else ageCounts["65歳以上"] += count;
+      }
+    }
+
+    const sumAge = Object.values(ageCounts).reduce((a, b) => a + b, 0) || totalPopulation;
+    const ageDistribution = Object.entries(ageCounts).map(([name, count]) => ({
+      name,
+      value: Math.round((count / sumAge) * 1000) / 10,
+      count,
+    }));
+    const agingRate = Math.round((ageCounts["65歳以上"] / sumAge) * 1000) / 10;
+
+    const municipalityNames = areaCodes.map((a) => a.name).join("・");
+
+    return {
+      code: areaCodes[0].code,
+      name: `${districtName}（${municipalityNames}）`,
+      totalPopulation,
+      malePopulation,
+      femalePopulation,
+      ageDistribution,
+      agingRate,
+      foreignRate: 0,
+    };
+  } catch (e) {
+    console.error("fetchAggregatedDemographics error:", e);
+    return null;
+  }
+}
+
+/**
  * 市区町村名から人口統計を取得するメイン関数
+ * 衆議院小選挙区の場合は構成市区町村の人口を集約
  */
 export async function getDemographicsForMunicipality(municipalityName: string): Promise<MunicipalityDemographics | null> {
+  // 衆議院小選挙区の場合
+  if (/第\d+区/.test(municipalityName)) {
+    const municipalities = await findDistrictMunicipalities(municipalityName);
+    if (municipalities.length > 0) {
+      return fetchAggregatedDemographics(municipalities, municipalityName);
+    }
+  }
+
+  // 通常の市区町村
   const area = await findAreaCode(municipalityName);
   if (!area) return null;
 

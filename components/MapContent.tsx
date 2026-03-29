@@ -34,9 +34,10 @@ function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: Geo
 
 const BOUNDARY_STYLE: L.PathOptions = {
   color: "#1B2A4A",
-  weight: 2.5,
-  fillColor: "#1B2A4A",
-  fillOpacity: 0.1,
+  weight: 3,
+  fillColor: "#3B5998",
+  fillOpacity: 0.15,
+  dashArray: "",
 };
 
 interface Props {
@@ -61,11 +62,10 @@ export default function MapContent({ location, geoData }: Props) {
           data={geoData}
           style={BOUNDARY_STYLE}
           onEachFeature={(feature, layer) => {
-            const name = feature.properties?.N03_001
-              || feature.properties?.N03_003
-              || feature.properties?.N03_004
-              || feature.properties?.KUNAME
-              || feature.properties?.name
+            const props = feature.properties || {};
+            const name = props.kuname
+              || [props.N03_001, props.N03_003, props.N03_004].filter(Boolean).join(" ")
+              || props.name
               || "";
             if (name) {
               layer.bindPopup(`<b>${name}</b>`);

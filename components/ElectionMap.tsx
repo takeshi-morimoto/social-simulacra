@@ -104,12 +104,11 @@ export default function ElectionMap({ municipality }: Props) {
           .then((r) => r.ok ? r.json() : null)
           .then((data) => {
             if (!data || !districtNum) return data;
-            // 該当選挙区だけフィルタ
+            // 該当選挙区だけフィルタ（プロパティ: ku=数値, kuname="栃木4区"形式）
             const filtered = {
               ...data,
               features: data.features.filter((f: GeoJSON.Feature) => {
-                const kuname = f.properties?.KUNAME || f.properties?.name || "";
-                return kuname.includes(`${districtNum}区`) || kuname.includes(`第${districtNum}`);
+                return f.properties?.ku === districtNum;
               }),
             };
             return filtered.features.length > 0 ? filtered : data;
