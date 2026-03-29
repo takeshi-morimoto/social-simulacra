@@ -32,6 +32,33 @@ export interface MunicipalityDemographics {
   foreignRate: number;
 }
 
+export interface PrefectureTurnout {
+  prefCode: string;
+  prefName: string;
+  shugiinSmall: number | null;
+  shugiinProp: number | null;
+  sangiinProp: number | null;
+  sangiinConst: number | null;
+  prefAssembly: number | null;
+  governor: number | null;
+  municipalAssembly: number | null;
+  mayor: number | null;
+}
+
+// 都道府県コードマッピング
+const PREF_MAP: Record<string, string> = {
+  "北海道": "01000", "青森": "02000", "岩手": "03000", "宮城": "04000", "秋田": "05000",
+  "山形": "06000", "福島": "07000", "茨城": "08000", "栃木": "09000", "群馬": "10000",
+  "埼玉": "11000", "千葉": "12000", "東京": "13000", "神奈川": "14000", "新潟": "15000",
+  "富山": "16000", "石川": "17000", "福井": "18000", "山梨": "19000", "長野": "20000",
+  "岐阜": "21000", "静岡": "22000", "愛知": "23000", "三重": "24000", "滋賀": "25000",
+  "京都": "26000", "大阪": "27000", "兵庫": "28000", "奈良": "29000", "和歌山": "30000",
+  "鳥取": "31000", "島根": "32000", "岡山": "33000", "広島": "34000", "山口": "35000",
+  "徳島": "36000", "香川": "37000", "愛媛": "38000", "高知": "39000", "福岡": "40000",
+  "佐賀": "41000", "長崎": "42000", "熊本": "43000", "大分": "44000", "宮崎": "45000",
+  "鹿児島": "46000", "沖縄": "47000",
+};
+
 /**
  * 市区町村名からe-Statの地域コードを検索する
  */
@@ -169,4 +196,93 @@ export async function getDemographicsForMunicipality(municipalityName: string): 
   if (!area) return null;
 
   return fetchDemographics(area.code, area.name);
+}
+
+/**
+ * 選挙区名から都道府県コードを抽出
+ */
+function extractPrefCode(municipalityName: string): string | null {
+  for (const [name, code] of Object.entries(PREF_MAP)) {
+    if (municipalityName.includes(name)) return code;
+  }
+  return null;
+}
+
+/**
+ * 都道府県名を抽出
+ */
+export function extractPrefName(municipalityName: string): string | null {
+  for (const name of Object.keys(PREF_MAP)) {
+    if (municipalityName.includes(name)) return name;
+  }
+  return null;
+}
+
+/**
+ * 都道府県コードの2桁番号を取得（地図GeoJSON用）
+ */
+export function extractPrefCodeShort(municipalityName: string): string | null {
+  const code = extractPrefCode(municipalityName);
+  if (!code) return null;
+  return code.substring(0, 2);
+}
+
+// 社会・人口統計体系 都道府県データ（投票率含む）
+const TURNOUT_STATS_ID = "0000010107";
+
+// 投票率カテゴリコード
+const TURNOUT_CATS: Record<string, keyof Omit<PrefectureTurnout, "prefCode" | "prefName">> = {
+  "G6301": "shugiinSmall",
+  "G6302": "shugiinProp",
+  "G6303": "sangiinProp",
+  "G6304": "sangiinConst",
+  "G6305": "prefAssembly",
+  "G6306": "governor",
+  "G6307": "municipalAssembly",
+  "G6308": "mayor",
+};
+
+/**
+ * 都道府県の選挙投票率を取得（直近のデータ）
+ */
+export async function fetchPrefTurnout(municipalityName: string): Promise<PrefectureTurnout | null> {
+  const prefCode = extractPrefCode(municipalityName);
+  if (!prefCode) return null;
+
+  const prefName = extractPrefName(municipalityName) || "";
+
+  const catCodes = Object.keys(TURNOUT_CATS).join(",");
+  const url = `${ESTAT_BASE}/getStatsData?appId=${APP_ID}&statsDataId=${TURNOUT_STATS_ID}&cdCat01=${catCodes}&cdArea=${prefCode}&limit=200`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const values = data.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF?.VALUE;
+    if (!values?.length) return null;
+
+    const result: PrefectureTurnout = {
+      prefCode,
+      prefName,
+      shugiinSmall: null, shugiinProp: null,
+      sangiinProp: null, sangiinConst: null,
+      prefAssembly: null, governor: null,
+      municipalAssembly: null, mayor: null,
+    };
+
+    // 各カテゴリの最新データ（最大の年）を取得
+    for (const [catCode, field] of Object.entries(TURNOUT_CATS)) {
+      const catValues = values
+        .filter((v: { "@cat01": string; $: string }) => v["@cat01"] === catCode && v.$ !== "-")
+        .sort((a: { "@time": string }, b: { "@time": string }) => b["@time"].localeCompare(a["@time"]));
+
+      if (catValues.length > 0) {
+        result[field] = parseFloat(catValues[0].$) || null;
+      }
+    }
+
+    return result;
+  } catch (e) {
+    console.error("fetchPrefTurnout error:", e);
+    return null;
+  }
 }
