@@ -191,20 +191,27 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
 // 事前生成された選挙区→構成市区町村マッピング（turf.jsでポリゴン判定済み）
 import districtMap from "./district-map.json";
 
+export interface DistrictMunicipality {
+  code: string;
+  name: string;
+  overlapRatio: number; // この選挙区に含まれる割合（%）
+  partial: boolean; // 分割されている場合true
+}
+
 interface DistrictEntry {
   kucode: number;
   kuname: string;
   prefCode: string;
   prefName: string;
   ku: number;
-  municipalities: { code: string; name: string }[];
+  municipalities: DistrictMunicipality[];
 }
 
 /**
  * 衆議院小選挙区の構成市区町村を取得する
- * 事前生成済みのマッピングJSONを参照（GeoJSONポリゴン判定で生成）
+ * 事前生成済みのマッピングJSONを参照（turf.js面積重なり判定で生成）
  */
-function findDistrictMunicipalities(municipalityName: string): { code: string; name: string }[] {
+function findDistrictMunicipalities(municipalityName: string): DistrictMunicipality[] {
   // "栃木県第4区" のような入力を正規化してマッピングキーに変換
   const prefName = extractPrefName(municipalityName);
   const districtNum = municipalityName.match(/第(\d+)区/)?.[1];
@@ -223,10 +230,10 @@ function findDistrictMunicipalities(municipalityName: string): { code: string; n
 }
 
 /**
- * 複数市区町村の人口データを集約
+ * 複数市区町村の人口データを集約（重なり率で按分）
  */
 async function fetchAggregatedDemographics(
-  areaCodes: { code: string; name: string }[],
+  areaCodes: DistrictMunicipality[],
   districtName: string,
 ): Promise<MunicipalityDemographics | null> {
   if (areaCodes.length === 0) return null;
@@ -240,29 +247,36 @@ async function fetchAggregatedDemographics(
     const values: EStatValue[] = data.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF?.VALUE;
     if (!values?.length) return null;
 
+    // 重なり率のマップを作成
+    const ratioMap = new Map<string, number>();
+    for (const a of areaCodes) {
+      ratioMap.set(a.code, (a.overlapRatio || 100) / 100);
+    }
+
     let totalPopulation = 0, malePopulation = 0, femalePopulation = 0;
     const ageCounts: Record<string, number> = {
       "0〜14歳": 0, "15〜29歳": 0, "30〜44歳": 0, "45〜64歳": 0, "65歳以上": 0,
     };
 
-    // 各市区町村の総人口を合算
-    for (const areaCode of areaCodes.map((a) => a.code)) {
-      const areaValues = values.filter((v) => v["@area"] === areaCode);
+    // 各市区町村の人口を重なり率で按分して合算
+    for (const area of areaCodes) {
+      const ratio = ratioMap.get(area.code) || 1;
+      const areaValues = values.filter((v) => v["@area"] === area.code);
 
       const total = areaValues.find((v) => v["@cat02"] === "0" && v["@cat03"] === "000");
       const male = areaValues.find((v) => v["@cat02"] === "1" && v["@cat03"] === "000");
       const female = areaValues.find((v) => v["@cat02"] === "2" && v["@cat03"] === "000");
 
-      totalPopulation += parseInt(total?.$ || "0") || 0;
-      malePopulation += parseInt(male?.$ || "0") || 0;
-      femalePopulation += parseInt(female?.$ || "0") || 0;
+      totalPopulation += Math.round((parseInt(total?.$ || "0") || 0) * ratio);
+      malePopulation += Math.round((parseInt(male?.$ || "0") || 0) * ratio);
+      femalePopulation += Math.round((parseInt(female?.$ || "0") || 0) * ratio);
 
-      // 年齢別集計
+      // 年齢別集計（按分）
       const ageData = areaValues.filter((v) => v["@cat02"] === "0" && v["@cat03"] !== "000");
       for (const v of ageData) {
         const ageCode = parseInt(v["@cat03"]);
         const age = ageCode - 1;
-        const count = parseInt(v.$) || 0;
+        const count = Math.round((parseInt(v.$) || 0) * ratio);
         if (age < 0 || isNaN(age)) continue;
         if (age <= 14) ageCounts["0〜14歳"] += count;
         else if (age <= 29) ageCounts["15〜29歳"] += count;
@@ -280,7 +294,9 @@ async function fetchAggregatedDemographics(
     }));
     const agingRate = Math.round((ageCounts["65歳以上"] / sumAge) * 1000) / 10;
 
-    const municipalityNames = areaCodes.map((a) => a.name).join("・");
+    const fullMunis = areaCodes.filter((a) => !a.partial).map((a) => a.name);
+    const partialMunis = areaCodes.filter((a) => a.partial).map((a) => `${a.name}(${a.overlapRatio}%)`);
+    const municipalityNames = [...fullMunis, ...partialMunis].join("・");
 
     return {
       code: areaCodes[0].code,

@@ -1,6 +1,6 @@
 /**
  * 衆議院小選挙区 → 構成市区町村の対応マッピングを生成するスクリプト
- * 選挙区GeoJSONと市区町村GeoJSONのポリゴン重なりで正確に判定
+ * turf.jsのintersectで面積重なりを計算し、分割市区町村も正確に判定
  *
  * Usage: node scripts/generate-district-map.mjs
  */
@@ -35,23 +35,21 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-// ポリゴンの重心を計算
-function getCenter(feature) {
+// ポリゴンの面積を計算（平方キロメートル）
+function getArea(feature) {
   try {
-    const centroid = turf.centroid(feature);
-    return centroid.geometry.coordinates;
+    return turf.area(feature) / 1_000_000;
   } catch {
-    return null;
+    return 0;
   }
 }
 
-// 点がポリゴン内にあるか判定
-function isPointInFeature(point, feature) {
+// 2つのポリゴンの交差部分を取得
+function getIntersection(feature1, feature2) {
   try {
-    const pt = turf.point(point);
-    return turf.booleanPointInPolygon(pt, feature);
+    return turf.intersect(turf.featureCollection([feature1, feature2]));
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -70,6 +68,26 @@ async function processPrefecture(prefCode) {
     return {};
   }
 
+  // 同じ市区町村コードの複数フィーチャーを統合（飛び地等）
+  const muniMap = new Map();
+  for (const muni of muniData.features) {
+    const code = muni.properties?.N03_007;
+    const name = muni.properties?.N03_004 || muni.properties?.N03_003 || "";
+    if (!code || !name) continue;
+
+    if (muniMap.has(code)) {
+      const existing = muniMap.get(code);
+      try {
+        const merged = turf.union(turf.featureCollection([existing.feature, muni]));
+        if (merged) existing.feature = merged;
+      } catch {
+        // union失敗時は最初のフィーチャーをそのまま使う
+      }
+    } else {
+      muniMap.set(code, { code, name, feature: muni });
+    }
+  }
+
   const result = {};
 
   for (const district of districtData.features) {
@@ -78,22 +96,38 @@ async function processPrefecture(prefCode) {
     const key = `${prefName}第${ku}区`;
 
     const municipalities = [];
-    const seen = new Set();
 
-    for (const muni of muniData.features) {
-      const code = muni.properties?.N03_007;
-      const name = muni.properties?.N03_004 || muni.properties?.N03_003 || "";
-      if (!code || !name || seen.has(code)) continue;
+    for (const [code, muni] of muniMap) {
+      // 面積ベースの重なり判定
+      const intersection = getIntersection(district, muni.feature);
+      if (!intersection) continue;
 
-      // 市区町村の重心が選挙区ポリゴン内にあるか判定
-      const center = getCenter(muni);
-      if (center && isPointInFeature(center, district)) {
-        municipalities.push({ code, name });
-        seen.add(code);
+      const intersectionArea = getArea(intersection);
+      const muniArea = getArea(muni.feature);
+
+      if (intersectionArea <= 0) continue;
+
+      // 重なり率（市区町村面積に対する割合）
+      const overlapRatio = muniArea > 0 ? Math.round((intersectionArea / muniArea) * 1000) / 10 : 0;
+
+      // 面積の1%以上が重なっていれば含める
+      if (overlapRatio >= 1) {
+        municipalities.push({
+          code: muni.code,
+          name: muni.name,
+          overlapRatio, // この選挙区に含まれる割合（%）
+          partial: overlapRatio < 95, // 分割されている場合true
+        });
       }
     }
 
+    // 重なり率の降順でソート
+    municipalities.sort((a, b) => b.overlapRatio - a.overlapRatio);
+
     if (municipalities.length > 0) {
+      const fullMunis = municipalities.filter(m => !m.partial);
+      const partialMunis = municipalities.filter(m => m.partial);
+
       result[key] = {
         kucode: district.properties.kucode,
         kuname,
@@ -102,7 +136,10 @@ async function processPrefecture(prefCode) {
         ku,
         municipalities,
       };
-      console.log(`  ${key}: ${municipalities.map(m => m.name).join(", ")}`);
+
+      const fullNames = fullMunis.map(m => m.name).join(", ");
+      const partialNames = partialMunis.map(m => `${m.name}(${m.overlapRatio}%)`).join(", ");
+      console.log(`  ${key}: ${fullNames}${partialNames ? ` | 分割: ${partialNames}` : ""}`);
     }
   }
 
@@ -110,20 +147,27 @@ async function processPrefecture(prefCode) {
 }
 
 async function main() {
-  console.log("Generating election district → municipality mapping...\n");
+  console.log("Generating election district → municipality mapping (with area overlap)...\n");
 
   const allData = {};
 
   for (const prefCode of PREF_CODES) {
     const data = await processPrefecture(prefCode);
     Object.assign(allData, data);
-    // Rate limit to be nice to GitHub
     await new Promise(r => setTimeout(r, 500));
   }
 
   const outputPath = "lib/district-map.json";
   writeFileSync(outputPath, JSON.stringify(allData, null, 2), "utf-8");
-  console.log(`\nDone! Wrote ${Object.keys(allData).length} districts to ${outputPath}`);
+
+  // 統計
+  const totalDistricts = Object.keys(allData).length;
+  let splitCount = 0;
+  for (const entry of Object.values(allData)) {
+    if (entry.municipalities.some(m => m.partial)) splitCount++;
+  }
+  console.log(`\nDone! ${totalDistricts} districts, ${splitCount} with split municipalities`);
+  console.log(`Output: ${outputPath}`);
 }
 
 main().catch(console.error);
