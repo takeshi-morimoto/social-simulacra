@@ -188,111 +188,38 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
   }
 }
 
+// 事前生成された選挙区→構成市区町村マッピング（turf.jsでポリゴン判定済み）
+import districtMap from "./district-map.json";
+
+interface DistrictEntry {
+  kucode: number;
+  kuname: string;
+  prefCode: string;
+  prefName: string;
+  ku: number;
+  municipalities: { code: string; name: string }[];
+}
+
 /**
- * 衆議院小選挙区の構成市区町村を特定する
- * AIに構成市区町村を聞く代わりに、e-Statのメタ情報から都道府県内の全市区町村を取得し、
- * 選挙区GeoJSONと照合して特定する
+ * 衆議院小選挙区の構成市区町村を取得する
+ * 事前生成済みのマッピングJSONを参照（GeoJSONポリゴン判定で生成）
  */
-async function findDistrictMunicipalities(municipalityName: string): Promise<{ code: string; name: string }[]> {
-  const prefCode = extractPrefCodeShort(municipalityName);
-  if (!prefCode) return [];
-
+function findDistrictMunicipalities(municipalityName: string): { code: string; name: string }[] {
+  // "栃木県第4区" のような入力を正規化してマッピングキーに変換
+  const prefName = extractPrefName(municipalityName);
   const districtNum = municipalityName.match(/第(\d+)区/)?.[1];
-  if (!districtNum) return [];
+  if (!prefName || !districtNum) return [];
 
-  const prefName = extractPrefName(municipalityName) || "";
+  // "栃木" → "栃木県" に正規化
+  const fullPrefName = prefName + (prefName.match(/(都|道|府|県)$/) ? "" :
+    prefName === "北海道" ? "" :
+    prefName === "東京" ? "都" :
+    prefName === "大阪" || prefName === "京都" ? "府" : "県");
 
-  try {
-    // 選挙区GeoJSONを取得して、該当選挙区のポリゴン中心点を取得
-    const geoRes = await fetch(
-      `https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/constituency/geojson/s0001/senkyoku289polygon_${prefCode}.json`
-    );
-    if (!geoRes.ok) return [];
-    const geoData = await geoRes.json();
+  const key = `${fullPrefName}第${districtNum}区`;
+  const entry = (districtMap as Record<string, DistrictEntry>)[key];
 
-    const districtFeature = geoData.features.find(
-      (f: GeoJSON.Feature) => f.properties?.ku === parseInt(districtNum)
-    );
-    if (!districtFeature) return [];
-
-    // 市区町村GeoJSONを取得
-    const muniRes = await fetch(
-      `https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010/N03-21_${prefCode}_210101.json`
-    );
-    if (!muniRes.ok) return [];
-    const muniData = await muniRes.json();
-
-    // 選挙区ポリゴンの重心を計算する簡易関数
-    function getCentroid(coords: number[][]): [number, number] {
-      let latSum = 0, lngSum = 0;
-      for (const [lng, lat] of coords) { latSum += lat; lngSum += lng; }
-      return [latSum / coords.length, lngSum / coords.length];
-    }
-
-    // 選挙区ポリゴンのバウンディングボックスを取得
-    function getBBox(geometry: GeoJSON.Geometry): [number, number, number, number] {
-      let minLng = 999, minLat = 999, maxLng = -999, maxLat = -999;
-      function processCoords(coords: unknown) {
-        if (typeof coords === "number") return;
-        if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === "number") {
-          const [lng, lat] = coords as [number, number];
-          minLng = Math.min(minLng, lng); maxLng = Math.max(maxLng, lng);
-          minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
-          return;
-        }
-        if (Array.isArray(coords)) coords.forEach(processCoords);
-      }
-      if ("coordinates" in geometry) processCoords(geometry.coordinates);
-      return [minLng, minLat, maxLng, maxLat];
-    }
-
-    // 点がバウンディングボックス内にあるか
-    function inBBox(lat: number, lng: number, bbox: [number, number, number, number]): boolean {
-      return lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3];
-    }
-
-    const districtBBox = getBBox(districtFeature.geometry);
-    // バウンディングボックスを少し拡大して含まれる市区町村を特定
-    const expandedBBox: [number, number, number, number] = [
-      districtBBox[0] - 0.01, districtBBox[1] - 0.01,
-      districtBBox[2] + 0.01, districtBBox[3] + 0.01,
-    ];
-
-    // 各市区町村の重心が選挙区バウンディングボックス内にあるか判定
-    const municipalities: { code: string; name: string }[] = [];
-    const seen = new Set<string>();
-
-    for (const feature of muniData.features) {
-      const code = feature.properties?.N03_007;
-      const name = feature.properties?.N03_004 || feature.properties?.N03_003 || "";
-      if (!code || !name || seen.has(code)) continue;
-
-      // 市区町村ポリゴンの重心
-      let coords: number[][] = [];
-      const geom = feature.geometry;
-      if (geom.type === "Polygon") {
-        coords = geom.coordinates[0];
-      } else if (geom.type === "MultiPolygon") {
-        coords = geom.coordinates[0][0];
-      }
-      if (coords.length === 0) continue;
-
-      const [lat, lng] = getCentroid(coords);
-      if (inBBox(lat, lng, expandedBBox)) {
-        // さらに精密に: 選挙区ポリゴンのバウンディングボックスで絞り込み
-        // (完全なポリゴン判定は重いので、BBox近似で十分)
-        if (inBBox(lat, lng, districtBBox)) {
-          municipalities.push({ code, name });
-          seen.add(code);
-        }
-      }
-    }
-
-    return municipalities;
-  } catch (e) {
-    console.error("findDistrictMunicipalities error:", e);
-    return [];
-  }
+  return entry?.municipalities || [];
 }
 
 /**
