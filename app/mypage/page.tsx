@@ -13,6 +13,7 @@ export default function MyPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<CandidateProfile>({ ...INITIAL });
+  const [customData, setCustomData] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -25,7 +26,10 @@ export default function MyPage() {
       fetch("/api/candidate-profile")
         .then((r) => r.json())
         .then((data) => {
-          if (data) setProfile({ name: data.name, party: data.party, district: data.district, platform: data.platform });
+          if (data) {
+            setProfile({ name: data.name, party: data.party, district: data.district, platform: data.platform });
+            setCustomData(data.customData || "");
+          }
         });
     }
   }, [session]);
@@ -37,7 +41,7 @@ export default function MyPage() {
       const res = await fetch("/api/candidate-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({ ...profile, customData }),
       });
       setMessage(res.ok ? "保存しました" : "保存に失敗しました");
     } catch {
@@ -79,6 +83,19 @@ export default function MyPage() {
       <hr className="my-5 border-gray-200" />
 
       <CandidateProfileInput profile={profile} onChange={setProfile} />
+
+      <div className="rounded-lg border border-gray-200 bg-white p-5 mb-6 shadow-sm">
+        <div className="mb-3 text-sm font-semibold text-gray-800">追加情報（任意）</div>
+        <div className="text-[11px] text-gray-400 mb-2">
+          アンケート結果、対立候補の情報、地域事情など、シミュレーションに反映させたい情報を自由に入力してください
+        </div>
+        <textarea
+          value={customData}
+          onChange={(e) => setCustomData(e.target.value)}
+          placeholder={"例：\n・前回選挙では投票率42%、現職が60%の得票率で当選\n・対立候補のA氏は医療費無料化を公約に掲げている\n・地域では最近、大型商業施設の撤退が話題になっている"}
+          className="w-full min-h-[100px] rounded-md border border-gray-300 bg-white p-3 text-sm leading-relaxed text-gray-900 outline-none resize-y focus:ring-2 focus:ring-[#1B2A4A] focus:border-[#1B2A4A] placeholder:text-gray-400"
+        />
+      </div>
 
       <div className="flex items-center gap-3">
         <button

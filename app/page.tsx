@@ -39,7 +39,10 @@ export default function Home() {
       fetch("/api/candidate-profile")
         .then((r) => r.json())
         .then((data) => {
-          if (data) setCandidateProfile({ name: data.name, party: data.party, district: data.district, platform: data.platform });
+          if (data) {
+            setCandidateProfile({ name: data.name, party: data.party, district: data.district, platform: data.platform });
+            if (data.customData) setCustomData(data.customData);
+          }
         });
     }
   }, [session]);
@@ -249,8 +252,6 @@ export default function Home() {
             analysis={analysis}
             analysisLoading={analysisLoading}
             showAnalysis={showAnalysis}
-            customData={customData}
-            onCustomDataChange={setCustomData}
             candidateProfile={candidateProfile}
             ageFilter={ageFilter}
             onAgeFilterChange={setAgeFilter}

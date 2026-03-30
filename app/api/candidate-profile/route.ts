@@ -20,7 +20,7 @@ export async function PUT(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json(null, { status: 401 });
 
-  const { name, party, district, platform } = await req.json();
+  const { name, party, district, platform, customData } = await req.json();
 
   const [existing] = await db
     .select()
@@ -29,11 +29,11 @@ export async function PUT(req: Request) {
 
   if (existing) {
     await db.update(candidateProfiles)
-      .set({ name, party, district, platform, updatedAt: new Date() })
+      .set({ name, party, district, platform, customData: customData || "", updatedAt: new Date() })
       .where(eq(candidateProfiles.userId, session.user.id));
   } else {
     await db.insert(candidateProfiles)
-      .values({ userId: session.user.id, name, party, district, platform });
+      .values({ userId: session.user.id, name, party, district, platform, customData: customData || "" });
   }
 
   return NextResponse.json({ success: true });

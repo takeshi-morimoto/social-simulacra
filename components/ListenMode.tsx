@@ -3,7 +3,6 @@
 import { useRef, useMemo } from "react";
 import type { VoterPersona, PersonaResponse, ElectionAnalysisResponse, StanceCounts, AgeGroupFilter, CandidateProfile } from "@/lib/types";
 import PolicyInput from "@/components/PolicyInput";
-import CustomDataInput from "@/components/CustomDataInput";
 import AgeFilter from "@/components/AgeFilter";
 import PersonaCard from "@/components/PersonaCard";
 import AnalysisReport from "@/components/AnalysisReport";
@@ -25,8 +24,6 @@ interface Props {
   analysis: ElectionAnalysisResponse | null;
   analysisLoading: boolean;
   showAnalysis: boolean;
-  customData: string;
-  onCustomDataChange: (v: string) => void;
   candidateProfile: CandidateProfile;
   ageFilter: AgeGroupFilter;
   onAgeFilterChange: (v: AgeGroupFilter) => void;
@@ -39,7 +36,6 @@ export default function ListenMode({
   personas, personaResults, loadingPersonas,
   stanceCounts, showStanceBar,
   analysis, analysisLoading, showAnalysis,
-  customData, onCustomDataChange,
   ageFilter, onAgeFilterChange,
 }: Props) {
   const shareCardRef = useRef<HTMLDivElement>(null);
@@ -68,7 +64,6 @@ export default function ListenMode({
   return (
     <>
       <PolicyInput policy={policy} onPolicyChange={onPolicyChange} onRun={onRun} isRunning={isRunning} />
-      <CustomDataInput value={customData} onChange={onCustomDataChange} />
 
       {isRunning && !showStanceBar && (
         <LoadingOverlay message="有権者の反応をシミュレーション中..." estimateSeconds={10} />

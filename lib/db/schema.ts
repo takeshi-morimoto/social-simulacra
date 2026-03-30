@@ -49,5 +49,6 @@ export const candidateProfiles = pgTable("candidate_profiles", {
   party: text("party").notNull().default(""),
   district: text("district").notNull().default(""),
   platform: text("platform").notNull().default(""),
+  customData: text("custom_data").notNull().default(""),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().$defaultFn(() => new Date()),
 });
