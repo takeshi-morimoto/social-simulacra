@@ -1,23 +1,10 @@
 "use client";
 
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { GeoLocation } from "./ElectionMap";
-
-const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-// Canvasレンダラーを使用（SVGのアンチエイリアシングによる白線を回避）
-const canvasRenderer = L.canvas({ padding: 0.5, tolerance: 0 });
 
 function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: GeoJSON.FeatureCollection | null }) {
   const map = useMap();
@@ -26,7 +13,7 @@ function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: Geo
       const geoLayer = L.geoJSON(geoData);
       const bounds = geoLayer.getBounds();
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [20, 20] });
+        map.fitBounds(bounds, { padding: [30, 30] });
         return;
       }
     }
@@ -35,12 +22,50 @@ function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: Geo
   return null;
 }
 
+// 選挙区の外側を半透明の白でマスクするGeoJSONを生成
+function createMaskGeoJSON(geoData: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection {
+  // 世界全体を覆う大きな矩形（外側ポリゴン）
+  const world: [number, number][] = [
+    [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
+  ];
+
+  // 選挙区のポリゴンを穴として使う
+  const holes: [number, number][][] = [];
+  for (const feature of geoData.features) {
+    const geom = feature.geometry;
+    if (geom.type === "Polygon") {
+      holes.push(geom.coordinates[0] as [number, number][]);
+    } else if (geom.type === "MultiPolygon") {
+      for (const poly of geom.coordinates) {
+        holes.push(poly[0] as [number, number][]);
+      }
+    }
+  }
+
+  return {
+    type: "FeatureCollection",
+    features: [{
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: [world, ...holes],
+      },
+    }],
+  };
+}
+
+const MASK_STYLE: L.PathOptions = {
+  color: "transparent",
+  weight: 0,
+  fillColor: "#ffffff",
+  fillOpacity: 0.55,
+};
+
 const BOUNDARY_STYLE: L.PathOptions = {
   color: "#1B2A4A",
-  weight: 2,
-  fillColor: "#3B5998",
-  fillOpacity: 0.2,
-  renderer: canvasRenderer,
+  weight: 2.5,
+  fill: false,
 };
 
 interface Props {
@@ -49,20 +74,28 @@ interface Props {
 }
 
 export default function MapContent({ location, geoData }: Props) {
+  const maskData = geoData ? createMaskGeoJSON(geoData) : null;
+
   return (
     <MapContainer
       center={[location.lat, location.lng]}
       zoom={12}
       style={{ height: "100%", width: "100%" }}
-      renderer={canvasRenderer}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      {maskData && (
+        <GeoJSON
+          key={"mask-" + JSON.stringify(geoData).substring(0, 50)}
+          data={maskData}
+          style={MASK_STYLE}
+        />
+      )}
       {geoData && (
         <GeoJSON
-          key={JSON.stringify(geoData).substring(0, 100)}
+          key={"boundary-" + JSON.stringify(geoData).substring(0, 50)}
           data={geoData}
           style={BOUNDARY_STYLE}
           onEachFeature={(feature, layer) => {
@@ -77,9 +110,6 @@ export default function MapContent({ location, geoData }: Props) {
           }}
         />
       )}
-      <Marker position={[location.lat, location.lng]} icon={icon}>
-        <Popup>{location.displayName}</Popup>
-      </Marker>
       <MapUpdater location={location} geoData={geoData} />
     </MapContainer>
   );
