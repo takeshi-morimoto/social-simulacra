@@ -36,8 +36,8 @@ const BOUNDARY_STYLE: L.PathOptions = {
   color: "#1B2A4A",
   weight: 3,
   fillColor: "#3B5998",
-  fillOpacity: 0.15,
-  dashArray: "",
+  fillOpacity: 0.25,
+  stroke: true,
 };
 
 interface Props {
