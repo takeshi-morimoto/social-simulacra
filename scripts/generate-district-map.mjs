@@ -8,6 +8,8 @@ import { writeFileSync } from "fs";
 import * as turf from "@turf/turf";
 
 const GEOJSON_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data";
+// 2022年改定版: ローカルのpublicフォルダから読み込み
+import { readFileSync } from "fs";
 const PREF_CODES = [
   "01","02","03","04","05","06","07","08","09","10",
   "11","12","13","14","15","16","17","18","19","20",
@@ -59,10 +61,10 @@ async function processPrefecture(prefCode) {
 
   let districtData, muniData;
   try {
-    [districtData, muniData] = await Promise.all([
-      fetchJSON(`${GEOJSON_BASE}/constituency/geojson/s0010/senkyoku289polygon_${prefCode}.json`),
-      fetchJSON(`${GEOJSON_BASE}/municipality/geojson/s0010/N03-21_${prefCode}_210101.json`),
-    ]);
+    // 2022年改定版の選挙区データをローカルから、市区町村はリモートから取得
+    const localPath = `public/geojson/senkyoku/${prefCode}.json`;
+    districtData = JSON.parse(readFileSync(localPath, "utf-8"));
+    muniData = await fetchJSON(`${GEOJSON_BASE}/municipality/geojson/s0010/N03-21_${prefCode}_210101.json`);
   } catch (e) {
     console.warn(`  Skipping ${prefName}: ${e.message}`);
     return {};

@@ -49,7 +49,10 @@ function getPrefCode(name: string): string | null {
   return null;
 }
 
-const GEOJSON_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data";
+// 2022年区割り改定版の選挙区GeoJSON（自前ホスト）
+const SENKYOKU_BASE = "/geojson/senkyoku";
+// 市区町村GeoJSON（smartnews-smri）
+const MUNICIPALITY_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010";
 
 export default function ElectionMap({ municipality }: Props) {
   const [location, setLocation] = useState<GeoLocation | null>(null);
@@ -99,12 +102,11 @@ export default function ElectionMap({ municipality }: Props) {
 
     if (prefCode) {
       if (electionType === "shuugiin") {
-        // 衆議院小選挙区: 都道府県別の選挙区GeoJSON
-        geoPromise = fetch(`${GEOJSON_BASE}/constituency/geojson/s0010/senkyoku289polygon_${prefCode}.json`)
+        // 衆議院小選挙区: 2022年区割り改定版GeoJSON
+        geoPromise = fetch(`${SENKYOKU_BASE}/${prefCode}.json`)
           .then((r) => r.ok ? r.json() : null)
           .then((data) => {
             if (!data || !districtNum) return data;
-            // 該当選挙区だけフィルタ（プロパティ: ku=数値, kuname="栃木4区"形式）
             const filtered = {
               ...data,
               features: data.features.filter((f: GeoJSON.Feature) => {
@@ -116,7 +118,7 @@ export default function ElectionMap({ municipality }: Props) {
           .catch(() => null);
       } else {
         // 市区町村・都道府県: 市区町村GeoJSON
-        geoPromise = fetch(`${GEOJSON_BASE}/municipality/geojson/s0010/N03-21_${prefCode}_210101.json`)
+        geoPromise = fetch(`${MUNICIPALITY_BASE}/N03-21_${prefCode}_210101.json`)
           .then((r) => r.ok ? r.json() : null)
           .then((data) => {
             if (!data) return null;
