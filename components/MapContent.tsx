@@ -1,7 +1,7 @@
 "use client";
 
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { GeoLocation } from "./ElectionMap";
@@ -15,6 +15,9 @@ const icon = L.icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
+
+// Canvasレンダラーを使用（SVGのアンチエイリアシングによる白線を回避）
+const canvasRenderer = L.canvas({ padding: 0.5, tolerance: 0 });
 
 function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: GeoJSON.FeatureCollection | null }) {
   const map = useMap();
@@ -34,10 +37,10 @@ function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: Geo
 
 const BOUNDARY_STYLE: L.PathOptions = {
   color: "#1B2A4A",
-  weight: 3,
+  weight: 2,
   fillColor: "#3B5998",
-  fillOpacity: 0.25,
-  stroke: true,
+  fillOpacity: 0.2,
+  renderer: canvasRenderer,
 };
 
 interface Props {
@@ -51,6 +54,7 @@ export default function MapContent({ location, geoData }: Props) {
       center={[location.lat, location.lng]}
       zoom={12}
       style={{ height: "100%", width: "100%" }}
+      renderer={canvasRenderer}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
