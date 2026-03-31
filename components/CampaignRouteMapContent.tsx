@@ -26,6 +26,8 @@ const SPOT_COLORS: Record<SpotType, string> = {
   park: "#27AE60",
   shelter: "#3498DB",
   landmark: "#F39C12",
+  shopping: "#9B59B6",
+  public_hall: "#1ABC9C",
 };
 
 function MapUpdater({ location, geoData }: { location: GeoLocation; geoData: GeoJSON.FeatureCollection | null }) {

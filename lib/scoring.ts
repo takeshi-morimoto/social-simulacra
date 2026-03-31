@@ -2,10 +2,12 @@ import type { CampaignSpot, SpotType, TimeSlot } from "./types";
 
 // 時間帯×スポット種別のスコアマトリクス (0-100)
 const SCORE_MATRIX: Record<SpotType, Record<TimeSlot, number>> = {
-  station:  { early_morning: 40, morning: 95, midday: 30, afternoon: 30, evening: 90, night: 25 },
-  park:     { early_morning: 15, morning: 40, midday: 85, afternoon: 75, evening: 50, night: 10 },
-  shelter:  { early_morning: 10, morning: 50, midday: 70, afternoon: 65, evening: 45, night: 10 },
-  landmark: { early_morning: 10, morning: 35, midday: 80, afternoon: 70, evening: 45, night: 15 },
+  station:     { early_morning: 40, morning: 95, midday: 30, afternoon: 30, evening: 90, night: 25 },
+  park:        { early_morning: 15, morning: 40, midday: 85, afternoon: 75, evening: 50, night: 10 },
+  shelter:     { early_morning: 10, morning: 50, midday: 70, afternoon: 65, evening: 45, night: 10 },
+  landmark:    { early_morning: 10, morning: 35, midday: 80, afternoon: 70, evening: 45, night: 15 },
+  shopping:    { early_morning: 5,  morning: 50, midday: 90, afternoon: 85, evening: 70, night: 20 },
+  public_hall: { early_morning: 5,  morning: 45, midday: 75, afternoon: 70, evening: 40, night: 10 },
 };
 
 export function getSpotScore(type: SpotType, timeSlot: TimeSlot): number {

@@ -17,6 +17,8 @@ const SPOT_ICONS: Record<string, string> = {
   park: "🌳",
   shelter: "🏛️",
   landmark: "📍",
+  shopping: "🛒",
+  public_hall: "🏢",
 };
 
 export default function DayPlanner({ stops, onOptimize, onRemove, onSave, saving, optimized }: Props) {

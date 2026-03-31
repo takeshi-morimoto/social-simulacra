@@ -14,6 +14,8 @@ const SPOT_COLORS: Record<SpotType, string> = {
   park: "#27AE60",
   shelter: "#3498DB",
   landmark: "#F39C12",
+  shopping: "#9B59B6",
+  public_hall: "#1ABC9C",
 };
 
 const SPOT_LABELS: Record<SpotType, string> = {
@@ -21,6 +23,8 @@ const SPOT_LABELS: Record<SpotType, string> = {
   park: "公園",
   shelter: "避難施設",
   landmark: "ランドマーク",
+  shopping: "商業施設",
+  public_hall: "公共施設",
 };
 
 const SPOT_ICONS: Record<SpotType, string> = {
@@ -28,6 +32,8 @@ const SPOT_ICONS: Record<SpotType, string> = {
   park: "🌳",
   shelter: "🏛️",
   landmark: "📍",
+  shopping: "🛒",
+  public_hall: "🏢",
 };
 
 type FilterType = "all" | SpotType;
@@ -42,6 +48,8 @@ export default function SpotList({ spots, selectedIds, onToggle }: Props) {
     { key: "all", label: "全て" },
     { key: "station", label: "駅" },
     { key: "park", label: "公園" },
+    { key: "shopping", label: "商業施設" },
+    { key: "public_hall", label: "公共施設" },
     { key: "shelter", label: "避難施設" },
     { key: "landmark", label: "ランドマーク" },
   ];

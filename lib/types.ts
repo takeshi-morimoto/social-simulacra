@@ -94,7 +94,7 @@ export type AgeGroupFilter = "all" | "18〜29歳" | "30〜44歳" | "45〜64歳" 
 
 // --- 遊説コース作成 ---
 
-export type SpotType = "station" | "park" | "shelter" | "landmark";
+export type SpotType = "station" | "park" | "shelter" | "landmark" | "shopping" | "public_hall";
 export type TimeSlot = "early_morning" | "morning" | "midday" | "afternoon" | "evening" | "night";
 
 export interface CampaignSpot {

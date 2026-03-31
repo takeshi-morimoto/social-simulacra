@@ -204,9 +204,11 @@ export default function CampaignRoutePage() {
               {/* 凡例 */}
               {scoredSpots.length > 0 && (
                 <div className="mt-3 bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-                  <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                  <div className="flex items-center gap-4 flex-wrap text-[10px] text-gray-500">
                     <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#E74C3C] mr-1" />駅</span>
                     <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#27AE60] mr-1" />公園</span>
+                    <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#9B59B6] mr-1" />商業施設</span>
+                    <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#1ABC9C] mr-1" />公共施設</span>
                     <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#3498DB] mr-1" />避難施設</span>
                     <span><span className="inline-block w-2.5 h-2.5 rounded-full bg-[#F39C12] mr-1" />ランドマーク</span>
                     <span className="ml-2 text-gray-400">マーカーの大きさ = 人流スコア</span>

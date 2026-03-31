@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllSpotsForArea } from "@/lib/plateau";
+import { fetchOverpassSpots } from "@/lib/overpass";
 import { findDistrictMunicipalities, findAreaCode } from "@/lib/estat";
 import * as turf from "@turf/turf";
 import { readFile } from "fs/promises";
@@ -14,24 +15,17 @@ interface DistrictEntry {
   municipalities: { code: string; name: string }[];
 }
 
-/**
- * 選挙区GeoJSONを読み込んで該当区のポリゴンを返す
- */
 async function loadDistrictPolygon(prefCode: string, ku: number): Promise<GeoJSON.Feature | null> {
   try {
     const filePath = path.join(process.cwd(), "public", "geojson", "senkyoku", `${prefCode}.json`);
     const raw = await readFile(filePath, "utf-8");
     const fc: GeoJSON.FeatureCollection = JSON.parse(raw);
-    const feature = fc.features.find((f) => f.properties?.ku === ku);
-    return feature || null;
+    return fc.features.find((f) => f.properties?.ku === ku) || null;
   } catch {
     return null;
   }
 }
 
-/**
- * スポットが選挙区ポリゴン内にあるかチェック
- */
 function filterSpotsInDistrict(spots: CampaignSpot[], districtFeature: GeoJSON.Feature): CampaignSpot[] {
   const geom = districtFeature.geometry;
   if (geom.type !== "Polygon" && geom.type !== "MultiPolygon") return spots;
@@ -48,6 +42,48 @@ function filterSpotsInDistrict(spots: CampaignSpot[], districtFeature: GeoJSON.F
       return false;
     }
   });
+}
+
+/**
+ * GeoJSON FeatureからOverpass用bbox [south, west, north, east] を取得
+ */
+function getBbox(feature: GeoJSON.Feature): [number, number, number, number] {
+  const [west, south, east, north] = turf.bbox(feature);
+  return [south, west, north, east];
+}
+
+/**
+ * 重複スポットを除去（同名・近接地点）
+ */
+function deduplicateSpots(spots: CampaignSpot[]): CampaignSpot[] {
+  const seen = new Set<string>();
+  return spots.filter((spot) => {
+    // 名前+おおまかな位置で重複判定
+    const key = `${spot.name}_${spot.lat.toFixed(4)}_${spot.lng.toFixed(4)}`;
+    if (seen.has(key) || seen.has(spot.id)) return false;
+    seen.add(key);
+    seen.add(spot.id);
+    return true;
+  });
+}
+
+/**
+ * 種別ごとの上限と全体上限でスポットを絞り込む
+ * 駅は全件残し、他は種別上限で切る
+ */
+function limitSpots(spots: CampaignSpot[], maxPerType: number, maxTotal: number): CampaignSpot[] {
+  const byType: Record<string, CampaignSpot[]> = {};
+  for (const s of spots) {
+    (byType[s.type] ??= []).push(s);
+  }
+
+  const result: CampaignSpot[] = [];
+  for (const [type, typeSpots] of Object.entries(byType)) {
+    const limit = maxPerType;
+    result.push(...typeSpots.slice(0, limit));
+  }
+
+  return result.slice(0, maxTotal);
 }
 
 export async function GET(req: Request) {
@@ -67,7 +103,6 @@ export async function GET(req: Request) {
       const municipalities = findDistrictMunicipalities(municipality);
       areaCodes = municipalities.map((m) => m.code);
 
-      // 選挙区ポリゴンを読み込み（空間フィルタ用）
       const entry = (districtMap as Record<string, DistrictEntry>)[municipality];
       if (entry) {
         districtFeature = await loadDistrictPolygon(entry.prefCode, entry.ku);
@@ -86,15 +121,33 @@ export async function GET(req: Request) {
       return NextResponse.json({ spots: [], message: "地域コードが見つかりませんでした" });
     }
 
-    let spots = await getAllSpotsForArea(areaCodes);
+    // 1. PLATEAUからスポット取得を試みる
+    let plateauSpots = await getAllSpotsForArea(areaCodes);
 
-    // 選挙区ポリゴンがあれば境界内のスポットだけに絞り込む
-    if (districtFeature && spots.length > 0) {
-      spots = filterSpotsInDistrict(spots, districtFeature);
+    // 選挙区ポリゴンがあれば境界内に絞り込む
+    if (districtFeature && plateauSpots.length > 0) {
+      plateauSpots = filterSpotsInDistrict(plateauSpots, districtFeature);
     }
 
+    // 2. OSM Overpass APIで補完
+    //    PLATEAUの有無に関わらず、商業施設・公共施設はOverpassから取得
+    let osmSpots: CampaignSpot[] = [];
+    if (districtFeature) {
+      const bbox = getBbox(districtFeature);
+      const rawOsmSpots = await fetchOverpassSpots(bbox);
+      osmSpots = filterSpotsInDistrict(rawOsmSpots, districtFeature);
+    }
+
+    // 3. マージ: PLATEAU優先、OSMで補完
+    const allSpots = deduplicateSpots([...plateauSpots, ...osmSpots]);
+
+    // 4. 件数が多すぎる場合、種別ごとに上限を設けてバランスよく絞る
+    const MAX_PER_TYPE = 30;
+    const MAX_TOTAL = 200;
+    const limited = limitSpots(allSpots, MAX_PER_TYPE, MAX_TOTAL);
+
     return NextResponse.json(
-      { spots },
+      { spots: limited, source: plateauSpots.length > 0 ? "plateau+osm" : "osm" },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
