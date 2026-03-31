@@ -186,7 +186,10 @@ export default function Home() {
               <span className="text-3xl font-black tracking-[0.12em] text-[#1B2A4A]" style={{ fontFamily: "'Noto Serif JP', serif" }}>参謀AI</span>
               <span className="text-xs tracking-[0.2em] text-gray-500 border-l border-gray-300 pl-5">SANBO AI</span>
             </div>
-            <AuthButton />
+            <div className="flex items-center gap-3">
+              <a href="/campaign-route" className="text-xs text-[#1B2A4A] border border-[#1B2A4A] px-3 py-1.5 rounded hover:bg-[#1B2A4A] hover:text-white transition-colors">遊説コース作成</a>
+              <AuthButton />
+            </div>
           </div>
           <div className="absolute inset-[3px] border border-[#C4A000] rounded-sm pointer-events-none" />
         </div>

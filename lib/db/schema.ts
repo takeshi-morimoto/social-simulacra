@@ -52,3 +52,14 @@ export const candidateProfiles = pgTable("candidate_profiles", {
   customData: text("custom_data").notNull().default(""),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().$defaultFn(() => new Date()),
 });
+
+// Campaign routes for 遊説コース
+export const campaignRoutes = pgTable("campaign_routes", {
+  id: uuid("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  municipality: text("municipality").notNull(),
+  name: text("name").notNull().default(""),
+  routeData: text("route_data").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().$defaultFn(() => new Date()),
+});

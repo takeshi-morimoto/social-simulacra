@@ -211,7 +211,7 @@ interface DistrictEntry {
  * 衆議院小選挙区の構成市区町村を取得する
  * 事前生成済みのマッピングJSONを参照（turf.js面積重なり判定で生成）
  */
-function findDistrictMunicipalities(municipalityName: string): DistrictMunicipality[] {
+export function findDistrictMunicipalities(municipalityName: string): DistrictMunicipality[] {
   // "栃木県第4区" のような入力を正規化してマッピングキーに変換
   const prefName = extractPrefName(municipalityName);
   const districtNum = municipalityName.match(/第(\d+)区/)?.[1];

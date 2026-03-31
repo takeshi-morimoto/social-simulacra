@@ -81,6 +81,7 @@ export default function MapContent({ location, geoData }: Props) {
       center={[location.lat, location.lng]}
       zoom={12}
       style={{ height: "100%", width: "100%" }}
+      preferCanvas={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

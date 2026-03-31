@@ -91,3 +91,41 @@ export interface CustomData {
 }
 
 export type AgeGroupFilter = "all" | "18〜29歳" | "30〜44歳" | "45〜64歳" | "65歳以上";
+
+// --- 遊説コース作成 ---
+
+export type SpotType = "station" | "park" | "shelter" | "landmark";
+export type TimeSlot = "early_morning" | "morning" | "midday" | "afternoon" | "evening" | "night";
+
+export interface CampaignSpot {
+  id: string;
+  name: string;
+  type: SpotType;
+  lat: number;
+  lng: number;
+  address?: string;
+  properties: Record<string, unknown>;
+  score: number;
+}
+
+export interface RouteStop {
+  spotId: string;
+  spot: CampaignSpot;
+  order: number;
+  startTime: string;
+  duration: number;
+}
+
+export interface CampaignDay {
+  dayNumber: number;
+  stops: RouteStop[];
+}
+
+export const TIME_SLOTS = [
+  { key: "early_morning" as const, label: "早朝 (5-7時)", hours: [5, 7] as const },
+  { key: "morning" as const, label: "朝 (7-10時)", hours: [7, 10] as const },
+  { key: "midday" as const, label: "昼 (10-14時)", hours: [10, 14] as const },
+  { key: "afternoon" as const, label: "午後 (14-17時)", hours: [14, 17] as const },
+  { key: "evening" as const, label: "夕方 (17-20時)", hours: [17, 20] as const },
+  { key: "night" as const, label: "夜 (20-22時)", hours: [20, 22] as const },
+] as const;
