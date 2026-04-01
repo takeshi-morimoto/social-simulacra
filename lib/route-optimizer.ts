@@ -117,9 +117,9 @@ export function generateDayPlan(spots: CampaignSpot[]): RouteStop[] {
   const usedIds = new Set<string>();
   const result: RouteStop[] = [];
   let lastSpot: CampaignSpot | null = null;
+  let order = 0;
 
   for (const block of DAY_TEMPLATE) {
-    // このブロックに適したスコアで再計算
     const timeSlot = block.startMinute < 7 * 60 ? "early_morning"
       : block.startMinute < 10 * 60 ? "morning"
       : block.startMinute < 14 * 60 ? "midday"
@@ -128,57 +128,33 @@ export function generateDayPlan(spots: CampaignSpot[]): RouteStop[] {
 
     const scored = spots.map((s) => ({ ...s, score: getSpotScore(s.type, timeSlot) }));
 
+    // ブロック内の開始時刻を計算
+    let blockMinutes = block.startMinute;
+
     for (let i = 0; i < block.count; i++) {
       const picked = pickBestSpot(scored, block.preferredTypes, lastSpot, usedIds);
       if (!picked) break;
+
+      // 前のスポットからの移動時間
+      if (lastSpot) {
+        const travel = Math.round((distanceKmSpots(picked, lastSpot) / 20) * 60);
+        blockMinutes = Math.max(blockMinutes, blockMinutes + travel);
+      }
 
       usedIds.add(picked.id);
       result.push({
         spotId: picked.id,
         spot: picked,
-        order: result.length,
-        startTime: "",
+        order: order++,
+        startTime: formatTime(blockMinutes),
         duration: block.dwell,
       });
+      blockMinutes += block.dwell;
       lastSpot = picked;
     }
   }
 
-  // 時刻割り当て（テンプレートの開始時刻を基準に）
-  let currentMinutes = DAY_TEMPLATE[0].startMinute;
-  let blockIdx = 0;
-  let blockSlotUsed = 0;
-
-  return result.map((stop, i) => {
-    // ブロック切り替え判定
-    while (blockIdx < DAY_TEMPLATE.length - 1) {
-      const block = DAY_TEMPLATE[blockIdx];
-      if (blockSlotUsed >= block.count) {
-        blockIdx++;
-        blockSlotUsed = 0;
-        // 次のブロックの開始時刻にジャンプ（移動時間を考慮）
-        const nextStart = DAY_TEMPLATE[blockIdx].startMinute;
-        if (currentMinutes < nextStart) {
-          currentMinutes = nextStart;
-        }
-      } else {
-        break;
-      }
-    }
-
-    if (i > 0) {
-      const travel = Math.round(
-        (distanceKmSpots(result[i - 1].spot, stop.spot) / 20) * 60,
-      );
-      currentMinutes += travel;
-    }
-
-    const startTime = formatTime(currentMinutes);
-    currentMinutes += stop.duration;
-    blockSlotUsed++;
-
-    return { ...stop, order: i, startTime };
-  });
+  return result;
 }
 
 // --- 既存のルート最適化 ---

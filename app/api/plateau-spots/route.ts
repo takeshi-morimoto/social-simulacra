@@ -53,18 +53,40 @@ function getBbox(feature: GeoJSON.Feature): [number, number, number, number] {
 }
 
 /**
+ * 名前を正規化（「岡本駅」と「岡本」を同一視するため）
+ */
+function normalizeName(name: string): string {
+  return name
+    .replace(/[（(].*?[）)]/g, "") // 括弧内を除去
+    .replace(/\s+/g, "")
+    .replace(/駅$/, ""); // 末尾の「駅」を除去
+}
+
+/**
  * 重複スポットを除去（同名・近接地点）
  */
 function deduplicateSpots(spots: CampaignSpot[]): CampaignSpot[] {
-  const seen = new Set<string>();
-  return spots.filter((spot) => {
-    // 名前+おおまかな位置で重複判定
-    const key = `${spot.name}_${spot.lat.toFixed(4)}_${spot.lng.toFixed(4)}`;
-    if (seen.has(key) || seen.has(spot.id)) return false;
-    seen.add(key);
-    seen.add(spot.id);
-    return true;
-  });
+  const result: CampaignSpot[] = [];
+  const seenPositions: { lat: number; lng: number; name: string }[] = [];
+
+  for (const spot of spots) {
+    const norm = normalizeName(spot.name);
+
+    // 近接地点（約100m以内）で正規化名が一致する場合は重複
+    const isDup = seenPositions.some((s) => {
+      const dist = Math.abs(s.lat - spot.lat) + Math.abs(s.lng - spot.lng);
+      if (dist > 0.002) return false; // ~200m以上離れていれば別物
+      const normSeen = normalizeName(s.name);
+      return norm === normSeen || norm.includes(normSeen) || normSeen.includes(norm);
+    });
+
+    if (!isDup) {
+      result.push(spot);
+      seenPositions.push({ lat: spot.lat, lng: spot.lng, name: spot.name });
+    }
+  }
+
+  return result;
 }
 
 /**
