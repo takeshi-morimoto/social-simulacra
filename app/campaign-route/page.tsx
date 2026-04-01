@@ -8,7 +8,7 @@ import SpotList from "@/components/SpotList";
 import DayPlanner from "@/components/DayPlanner";
 import DistrictCombobox from "@/components/DistrictCombobox";
 import { scoreSpots } from "@/lib/scoring";
-import { optimizeRoute } from "@/lib/route-optimizer";
+import { optimizeRoute, generateDayPlan, fetchOsrmRoute } from "@/lib/route-optimizer";
 import type { CampaignSpot, RouteStop, TimeSlot } from "@/lib/types";
 import Link from "next/link";
 
@@ -17,26 +17,23 @@ const DEFAULT_DWELL = 30;
 export default function CampaignRoutePage() {
   const { data: session } = useSession();
 
-  // 入力
   const [municipality, setMunicipality] = useState("");
   const [inputValue, setInputValue] = useState("");
 
-  // スポットデータ
   const [rawSpots, setRawSpots] = useState<CampaignSpot[]>([]);
   const [timeSlot, setTimeSlot] = useState<TimeSlot>("morning");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 選択・ルート
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [routeStops, setRouteStops] = useState<RouteStop[] | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][] | null>(null);
   const [optimized, setOptimized] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
-  // スコアリング
   const scoredSpots = useMemo(() => scoreSpots(rawSpots, timeSlot), [rawSpots, timeSlot]);
 
-  // スポット取得
   const fetchSpots = useCallback(async (district?: string) => {
     const target = district || inputValue.trim();
     if (!target) return;
@@ -45,6 +42,7 @@ export default function CampaignRoutePage() {
     setRawSpots([]);
     setSelectedIds(new Set());
     setRouteStops(null);
+    setRouteGeometry(null);
     setOptimized(false);
     setMunicipality(target);
 
@@ -55,7 +53,7 @@ export default function CampaignRoutePage() {
       if (data.spots && data.spots.length > 0) {
         setRawSpots(data.spots);
       } else {
-        setError("この地域のPLATEAUデータが見つかりませんでした。対応地域をお試しください。");
+        setError("この地域のスポットデータが見つかりませんでした。");
       }
     } catch {
       setError("スポットの取得に失敗しました");
@@ -64,23 +62,46 @@ export default function CampaignRoutePage() {
     }
   }, [inputValue]);
 
-  // スポット選択トグル
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(spotId)) {
-        next.delete(spotId);
-      } else {
-        next.add(spotId);
-      }
+      if (next.has(spotId)) next.delete(spotId);
+      else next.add(spotId);
       return next;
     });
     setRouteStops(null);
+    setRouteGeometry(null);
     setOptimized(false);
   }, []);
 
-  // ルート最適化
-  const handleOptimize = useCallback(() => {
+  // OSRM経路取得
+  const fetchRoute = useCallback(async (stops: RouteStop[]) => {
+    if (stops.length < 2) {
+      setRouteGeometry(null);
+      return;
+    }
+    const osrm = await fetchOsrmRoute(stops);
+    if (osrm) {
+      setRouteGeometry(osrm.geometry);
+      // OSRM の実移動時間で startTime を更新
+      let currentMinutes = parseInt(stops[0].startTime.split(":")[0]) * 60 +
+        parseInt(stops[0].startTime.split(":")[1]);
+      const updated = stops.map((stop, i) => {
+        if (i > 0) {
+          currentMinutes += osrm.durations[i - 1];
+        }
+        const h = Math.floor(currentMinutes / 60) % 24;
+        const m = currentMinutes % 60;
+        const startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+        currentMinutes += stop.duration;
+        return { ...stop, startTime };
+      });
+      setRouteStops(updated);
+    }
+  }, []);
+
+  // 手動ルート最適化
+  const handleOptimize = useCallback(async () => {
     const stops: RouteStop[] = scoredSpots
       .filter((s) => selectedIds.has(s.id))
       .map((spot, i) => ({
@@ -94,9 +115,30 @@ export default function CampaignRoutePage() {
     const optimizedStops = optimizeRoute(stops, 8);
     setRouteStops(optimizedStops);
     setOptimized(true);
-  }, [scoredSpots, selectedIds]);
 
-  // スポット削除
+    // OSRM で実経路を取得
+    await fetchRoute(optimizedStops);
+  }, [scoredSpots, selectedIds, fetchRoute]);
+
+  // 自動プラン生成
+  const handleAutoGenerate = useCallback(async () => {
+    if (rawSpots.length === 0) return;
+    setGenerating(true);
+
+    try {
+      const plan = generateDayPlan(rawSpots);
+      const ids = new Set(plan.map((s) => s.spotId));
+      setSelectedIds(ids);
+      setRouteStops(plan);
+      setOptimized(true);
+
+      // OSRM で実経路
+      await fetchRoute(plan);
+    } finally {
+      setGenerating(false);
+    }
+  }, [rawSpots, fetchRoute]);
+
   const handleRemove = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -104,9 +146,9 @@ export default function CampaignRoutePage() {
       return next;
     });
     setRouteStops((prev) => prev ? prev.filter((s) => s.spotId !== spotId) : null);
+    setRouteGeometry(null);
   }, []);
 
-  // 保存
   const handleSave = useCallback(async () => {
     if (!session?.user) {
       alert("保存するにはログインが必要です");
@@ -133,7 +175,6 @@ export default function CampaignRoutePage() {
     }
   }, [session, municipality, routeStops]);
 
-  // 選択中のスポットからRouteStop配列（未最適化時の表示用）
   const displayStops: RouteStop[] = useMemo(() => {
     if (routeStops) return routeStops;
     return scoredSpots
@@ -149,7 +190,6 @@ export default function CampaignRoutePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -165,7 +205,6 @@ export default function CampaignRoutePage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* 選挙区入力 */}
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm mb-6">
           <div className="text-sm font-semibold text-gray-800 mb-2">選挙区を選択</div>
           <div className="flex gap-2">
@@ -189,19 +228,38 @@ export default function CampaignRoutePage() {
           {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
         </div>
 
-        {/* メインコンテンツ: 2カラム */}
+        {/* 自動プラン生成ボタン */}
+        {rawSpots.length > 0 && (
+          <div className="bg-gradient-to-r from-[#1B2A4A] to-[#2a3d5c] rounded-lg p-4 mb-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white text-sm font-semibold">1日の遊説プランを自動生成</div>
+                <div className="text-white/60 text-xs mt-1">
+                  朝の駅立ち → 午前遊説 → 昼の街頭演説 → 午後遊説 → 夕方の駅立ち
+                </div>
+              </div>
+              <button
+                onClick={handleAutoGenerate}
+                disabled={generating}
+                className="px-5 py-2.5 bg-white text-[#1B2A4A] text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                {generating ? "生成中..." : "自動生成"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {municipality && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* 左: 地図 (3/5) */}
             <div className="lg:col-span-3">
               <CampaignRouteMap
                 municipality={municipality}
                 spots={scoredSpots}
                 selectedSpotIds={selectedIds}
                 routeStops={optimized ? routeStops : null}
+                routeGeometry={routeGeometry}
                 onSpotClick={(spot) => toggleSpot(spot.id)}
               />
-              {/* 凡例 */}
               {scoredSpots.length > 0 && (
                 <div className="mt-3 bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
                   <div className="flex items-center gap-4 flex-wrap text-[10px] text-gray-500">
@@ -217,7 +275,6 @@ export default function CampaignRoutePage() {
               )}
             </div>
 
-            {/* 右: 操作パネル (2/5) */}
             <div className="lg:col-span-2 space-y-4">
               <TimeSlider value={timeSlot} onChange={setTimeSlot} />
               <SpotList

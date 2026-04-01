@@ -17,6 +17,7 @@ interface Props {
   spots: CampaignSpot[];
   selectedSpotIds: Set<string>;
   routeStops: RouteStop[] | null;
+  routeGeometry?: [number, number][] | null;
   onSpotClick: (spot: CampaignSpot) => void;
 }
 
@@ -48,7 +49,7 @@ function extractDistrictNumber(name: string): number | null {
 const SENKYOKU_BASE = "/geojson/senkyoku";
 const MUNICIPALITY_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010";
 
-export default function CampaignRouteMap({ municipality, spots, selectedSpotIds, routeStops, onSpotClick }: Props) {
+export default function CampaignRouteMap({ municipality, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick }: Props) {
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
   const [loading, setLoading] = useState(false);
@@ -149,6 +150,7 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
             spots={spots}
             selectedSpotIds={selectedSpotIds}
             routeStops={routeStops}
+            routeGeometry={routeGeometry}
             onSpotClick={onSpotClick}
           />
         </div>

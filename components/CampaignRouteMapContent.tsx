@@ -18,6 +18,7 @@ interface Props {
   spots: CampaignSpot[];
   selectedSpotIds: Set<string>;
   routeStops: RouteStop[] | null;
+  routeGeometry?: [number, number][] | null;
   onSpotClick: (spot: CampaignSpot) => void;
 }
 
@@ -74,12 +75,15 @@ function createMaskGeoJSON(geoData: GeoJSON.FeatureCollection): GeoJSON.FeatureC
 const MASK_STYLE: L.PathOptions = { color: "transparent", weight: 0, fillColor: "#ffffff", fillOpacity: 0.55 };
 const BOUNDARY_STYLE: L.PathOptions = { color: "#1B2A4A", weight: 2.5, fill: false };
 
-export default function CampaignRouteMapContent({ location, geoData, spots, selectedSpotIds, routeStops, onSpotClick }: Props) {
+export default function CampaignRouteMapContent({ location, geoData, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick }: Props) {
   const maskData = geoData ? createMaskGeoJSON(geoData) : null;
 
-  const routePositions = routeStops
-    ? routeStops.map((s) => [s.spot.lat, s.spot.lng] as [number, number])
-    : [];
+  // OSRM経路があればそれを使用、なければ直線
+  const routePositions = routeGeometry && routeGeometry.length > 0
+    ? routeGeometry
+    : routeStops
+      ? routeStops.map((s) => [s.spot.lat, s.spot.lng] as [number, number])
+      : [];
 
   return (
     <MapContainer
@@ -140,7 +144,12 @@ export default function CampaignRouteMapContent({ location, geoData, spots, sele
       {routePositions.length >= 2 && (
         <Polyline
           positions={routePositions}
-          pathOptions={{ color: "#1B2A4A", weight: 3, opacity: 0.7, dashArray: "8, 6" }}
+          pathOptions={{
+            color: "#1B2A4A",
+            weight: routeGeometry ? 4 : 3,
+            opacity: 0.7,
+            dashArray: routeGeometry ? undefined : "8, 6",
+          }}
         />
       )}
 
