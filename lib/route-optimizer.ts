@@ -89,6 +89,7 @@ const DAY_TEMPLATE: TimeBlock[] = [
 
 /**
  * 時間帯ごとのスコアと距離を考慮してスポットを選択
+ * まず優先種別から選び、なければ他の種別にフォールバック
  */
 function pickBestSpot(
   candidates: CampaignSpot[],
@@ -99,11 +100,13 @@ function pickBestSpot(
   const available = candidates.filter((s) => !usedIds.has(s.id));
   if (available.length === 0) return null;
 
-  // スコア = 種別優先度 + スコア値 - 距離ペナルティ
-  const scored = available.map((s) => {
-    const typePriority = preferredTypes.includes(s.type) ? 50 : 0;
-    const distPenalty = lastSpot ? distanceKmSpots(s, lastSpot) * 5 : 0;
-    return { spot: s, score: typePriority + s.score - distPenalty };
+  // まず優先種別のスポットだけで候補を作る
+  const preferred = available.filter((s) => preferredTypes.includes(s.type));
+  const pool = preferred.length > 0 ? preferred : available;
+
+  const scored = pool.map((s) => {
+    const distPenalty = lastSpot ? distanceKmSpots(s, lastSpot) * 3 : 0;
+    return { spot: s, score: s.score - distPenalty };
   });
 
   scored.sort((a, b) => b.score - a.score);

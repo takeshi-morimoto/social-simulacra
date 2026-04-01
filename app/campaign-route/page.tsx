@@ -74,8 +74,8 @@ export default function CampaignRoutePage() {
     setOptimized(false);
   }, []);
 
-  // OSRM経路取得
-  const fetchRoute = useCallback(async (stops: RouteStop[]) => {
+  // OSRM経路取得（経路表示のみ、手動最適化時は時刻も更新）
+  const fetchRoute = useCallback(async (stops: RouteStop[], updateTimes: boolean = false) => {
     if (stops.length < 2) {
       setRouteGeometry(null);
       return;
@@ -83,20 +83,22 @@ export default function CampaignRoutePage() {
     const osrm = await fetchOsrmRoute(stops);
     if (osrm) {
       setRouteGeometry(osrm.geometry);
-      // OSRM の実移動時間で startTime を更新
-      let currentMinutes = parseInt(stops[0].startTime.split(":")[0]) * 60 +
-        parseInt(stops[0].startTime.split(":")[1]);
-      const updated = stops.map((stop, i) => {
-        if (i > 0) {
-          currentMinutes += osrm.durations[i - 1];
-        }
-        const h = Math.floor(currentMinutes / 60) % 24;
-        const m = currentMinutes % 60;
-        const startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-        currentMinutes += stop.duration;
-        return { ...stop, startTime };
-      });
-      setRouteStops(updated);
+      if (updateTimes) {
+        // 手動最適化の場合のみOSRM移動時間で時刻を更新
+        let currentMinutes = parseInt(stops[0].startTime.split(":")[0]) * 60 +
+          parseInt(stops[0].startTime.split(":")[1]);
+        const updated = stops.map((stop, i) => {
+          if (i > 0) {
+            currentMinutes += osrm.durations[i - 1];
+          }
+          const h = Math.floor(currentMinutes / 60) % 24;
+          const m = currentMinutes % 60;
+          const startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+          currentMinutes += stop.duration;
+          return { ...stop, startTime };
+        });
+        setRouteStops(updated);
+      }
     }
   }, []);
 
@@ -116,8 +118,8 @@ export default function CampaignRoutePage() {
     setRouteStops(optimizedStops);
     setOptimized(true);
 
-    // OSRM で実経路を取得
-    await fetchRoute(optimizedStops);
+    // OSRM で実経路＋移動時間を取得
+    await fetchRoute(optimizedStops, true);
   }, [scoredSpots, selectedIds, fetchRoute]);
 
   // 自動プラン生成
