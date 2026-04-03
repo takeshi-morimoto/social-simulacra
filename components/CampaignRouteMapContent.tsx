@@ -1,7 +1,7 @@
 "use client";
 
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, Polyline, Tooltip, useMap } from "react-leaflet";
-import { useEffect } from "react";
+import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
+import { useEffect, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CampaignSpot, RouteStop, SpotType } from "@/lib/types";
@@ -20,6 +20,8 @@ interface Props {
   routeStops: RouteStop[] | null;
   routeGeometry?: [number, number][] | null;
   onSpotClick: (spot: CampaignSpot) => void;
+  hoveredSpotId?: string | null;
+  onSpotHover?: (spotId: string | null) => void;
 }
 
 const SPOT_COLORS: Record<SpotType, string> = {
@@ -75,7 +77,16 @@ function createMaskGeoJSON(geoData: GeoJSON.FeatureCollection): GeoJSON.FeatureC
 const MASK_STYLE: L.PathOptions = { color: "transparent", weight: 0, fillColor: "#ffffff", fillOpacity: 0.55 };
 const BOUNDARY_STYLE: L.PathOptions = { color: "#1B2A4A", weight: 2.5, fill: false };
 
-export default function CampaignRouteMapContent({ location, geoData, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick }: Props) {
+function createFlagIcon(number: number): L.DivIcon {
+  return L.divIcon({
+    className: "route-flag-marker",
+    html: `<div class="flag-head"><span class="flag-number">${number}</span></div><div class="flag-tail"></div>`,
+    iconSize: [28, 38],
+    iconAnchor: [14, 38],
+  });
+}
+
+export default function CampaignRouteMapContent({ location, geoData, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick, hoveredSpotId, onSpotHover }: Props) {
   const maskData = geoData ? createMaskGeoJSON(geoData) : null;
 
   // OSRM経路があればそれを使用、なければ直線
@@ -114,9 +125,11 @@ export default function CampaignRouteMapContent({ location, geoData, spots, sele
       {/* スポットマーカー */}
       {spots.map((spot) => {
         const isSelected = selectedSpotIds.has(spot.id);
+        const isHovered = hoveredSpotId === spot.id;
         const color = SPOT_COLORS[spot.type];
-        const radius = 4 + (spot.score / 100) * 10;
-        const opacity = 0.3 + (spot.score / 100) * 0.7;
+        const baseRadius = 4 + (spot.score / 100) * 10;
+        const radius = isHovered ? baseRadius + 5 : baseRadius;
+        const opacity = isHovered ? 1 : 0.3 + (spot.score / 100) * 0.7;
 
         return (
           <CircleMarker
@@ -124,14 +137,18 @@ export default function CampaignRouteMapContent({ location, geoData, spots, sele
             center={[spot.lat, spot.lng]}
             radius={radius}
             pathOptions={{
-              color: isSelected ? "#1B2A4A" : color,
-              weight: isSelected ? 3 : 1.5,
-              fillColor: color,
+              color: isHovered ? "#F59E0B" : isSelected ? "#1B2A4A" : color,
+              weight: isHovered ? 3 : isSelected ? 3 : 1.5,
+              fillColor: isHovered ? "#FEF3C7" : color,
               fillOpacity: opacity,
             }}
-            eventHandlers={{ click: () => onSpotClick(spot) }}
+            eventHandlers={{
+              click: () => onSpotClick(spot),
+              mouseover: () => onSpotHover?.(spot.id),
+              mouseout: () => onSpotHover?.(null),
+            }}
           >
-            <Tooltip direction="top" offset={[0, -radius]}>
+            <Tooltip direction="top" offset={[0, -radius]} permanent={isHovered}>
               <span className="text-xs font-medium">{spot.name}</span>
               <br />
               <span className="text-[10px] text-gray-500">スコア: {spot.score}</span>
@@ -153,23 +170,14 @@ export default function CampaignRouteMapContent({ location, geoData, spots, sele
         />
       )}
 
-      {/* ルート番号マーカー */}
+      {/* ルート番号フラグマーカー */}
       {routeStops?.map((stop, i) => (
-        <CircleMarker
+        <Marker
           key={`route-${stop.spotId}`}
-          center={[stop.spot.lat, stop.spot.lng]}
-          radius={12}
-          pathOptions={{
-            color: "#1B2A4A",
-            weight: 2,
-            fillColor: "#1B2A4A",
-            fillOpacity: 0.9,
-          }}
-        >
-          <Tooltip direction="center" permanent className="route-number-tooltip">
-            <span style={{ color: "white", fontWeight: "bold", fontSize: "11px" }}>{i + 1}</span>
-          </Tooltip>
-        </CircleMarker>
+          position={[stop.spot.lat, stop.spot.lng]}
+          icon={createFlagIcon(i + 1)}
+          interactive={false}
+        />
       ))}
 
       <MapUpdater location={location} geoData={geoData} />

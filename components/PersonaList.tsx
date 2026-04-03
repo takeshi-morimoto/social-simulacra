@@ -24,8 +24,8 @@ export default function PersonaList({ personas }: Props) {
                 <div className="text-[12px] font-semibold text-gray-800 truncate">{p.name}</div>
                 <div className="text-[10px] text-gray-500">{p.age}歳 · {p.gender} · {p.role}</div>
               </div>
-              <div className="shrink-0 rounded-full bg-slate-100 border border-slate-200 px-1.5 py-0.5">
-                <span className="text-[9px] text-slate-600 font-medium">投票率 {Math.round((p.voterTurnoutWeight ?? 0.5) * 100)}%</span>
+              <div className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-slate-100 border border-slate-200">
+                <span className="text-[10px] text-slate-600 font-bold leading-none">{Math.round((p.voterTurnoutWeight ?? 0.5) * 100)}%</span>
               </div>
             </div>
             <div className="text-[11px] text-gray-600 leading-[1.6] mb-1.5">{p.detail}</div>

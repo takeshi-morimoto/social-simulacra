@@ -7,6 +7,8 @@ interface Props {
   spots: CampaignSpot[];
   selectedIds: Set<string>;
   onToggle: (spotId: string) => void;
+  hoveredSpotId?: string | null;
+  onHover?: (spotId: string | null) => void;
 }
 
 const SPOT_COLORS: Record<SpotType, string> = {
@@ -38,7 +40,7 @@ const SPOT_ICONS: Record<SpotType, string> = {
 
 type FilterType = "all" | SpotType;
 
-export default function SpotList({ spots, selectedIds, onToggle }: Props) {
+export default function SpotList({ spots, selectedIds, onToggle, hoveredSpotId, onHover }: Props) {
   const [filter, setFilter] = useState<FilterType>("all");
 
   const filtered = filter === "all" ? spots : spots.filter((s) => s.type === filter);
@@ -55,7 +57,7 @@ export default function SpotList({ spots, selectedIds, onToggle }: Props) {
   ];
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm absolute inset-0 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-gray-100">
         <div className="text-sm font-semibold text-gray-800 mb-2">
           スポット一覧
@@ -77,7 +79,7 @@ export default function SpotList({ spots, selectedIds, onToggle }: Props) {
           ))}
         </div>
       </div>
-      <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-50">
+      <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
         {sorted.length === 0 && (
           <div className="p-4 text-xs text-gray-400 text-center">スポットが見つかりません</div>
         )}
@@ -85,8 +87,11 @@ export default function SpotList({ spots, selectedIds, onToggle }: Props) {
           <button
             key={spot.id}
             onClick={() => onToggle(spot.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors ${
-              selectedIds.has(spot.id) ? "bg-blue-50" : ""
+            onMouseEnter={() => onHover?.(spot.id)}
+            onMouseLeave={() => onHover?.(null)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+              hoveredSpotId === spot.id ? "bg-yellow-50 ring-1 ring-yellow-300 ring-inset" :
+              selectedIds.has(spot.id) ? "bg-blue-50" : "hover:bg-gray-50"
             }`}
           >
             <span className="text-lg flex-shrink-0">{SPOT_ICONS[spot.type]}</span>

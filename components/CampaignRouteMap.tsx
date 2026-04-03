@@ -19,6 +19,8 @@ interface Props {
   routeStops: RouteStop[] | null;
   routeGeometry?: [number, number][] | null;
   onSpotClick: (spot: CampaignSpot) => void;
+  hoveredSpotId?: string | null;
+  onSpotHover?: (spotId: string | null) => void;
 }
 
 // 都道府県コードを抽出
@@ -49,7 +51,7 @@ function extractDistrictNumber(name: string): number | null {
 const SENKYOKU_BASE = "/geojson/senkyoku";
 const MUNICIPALITY_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010";
 
-export default function CampaignRouteMap({ municipality, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick }: Props) {
+export default function CampaignRouteMap({ municipality, spots, selectedSpotIds, routeStops, routeGeometry, onSpotClick, hoveredSpotId, onSpotHover }: Props) {
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
   const [loading, setLoading] = useState(false);
@@ -143,7 +145,7 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
       {loading && <div className="p-4 text-xs text-gray-400">地図を読み込み中...</div>}
       {!loading && location && (
-        <div className="h-[500px]">
+        <div className="h-[550px]">
           <CampaignRouteMapContent
             location={location}
             geoData={geoData}
@@ -152,6 +154,8 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
             routeStops={routeStops}
             routeGeometry={routeGeometry}
             onSpotClick={onSpotClick}
+            hoveredSpotId={hoveredSpotId}
+            onSpotHover={onSpotHover}
           />
         </div>
       )}

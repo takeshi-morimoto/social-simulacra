@@ -17,7 +17,19 @@ interface OverpassElement {
   lat?: number;
   lon?: number;
   center?: { lat: number; lon: number };
+  bounds?: { minlat: number; minlon: number; maxlat: number; maxlon: number };
   tags?: Record<string, string>;
+}
+
+/**
+ * バウンディングボックスからおおよその面積(m²)を算出
+ */
+function estimateAreaM2(bounds: { minlat: number; minlon: number; maxlat: number; maxlon: number }): number {
+  const latMid = (bounds.minlat + bounds.maxlat) / 2;
+  const dLatM = (bounds.maxlat - bounds.minlat) * 111_000;
+  const dLonM = (bounds.maxlon - bounds.minlon) * 111_000 * Math.cos((latMid * Math.PI) / 180);
+  // バウンディングボックスの約65%が実際の面積と仮定（矩形→多角形の補正）
+  return dLatM * dLonM * 0.65;
 }
 
 /**
@@ -56,7 +68,7 @@ out;
   nwr["amenity"="community_centre"](${bboxStr});
   nwr["amenity"="townhall"](${bboxStr});
 );
-out center;
+out center bb;
 `;
 
   try {
@@ -86,6 +98,12 @@ out center;
 
         const type = classifyOsmElement(tags);
 
+        // バウンディングボックスがあれば面積を推定
+        const props: Record<string, unknown> = { ...tags };
+        if (el.bounds) {
+          props._areaM2 = estimateAreaM2(el.bounds);
+        }
+
         return {
           id: generateSpotId(name, lat, lon),
           name,
@@ -93,7 +111,7 @@ out center;
           lat,
           lng: lon,
           address: tags["addr:full"] || tags["addr:city"] || undefined,
-          properties: tags,
+          properties: props,
           score: 0,
         } as CampaignSpot;
       })

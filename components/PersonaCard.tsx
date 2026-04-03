@@ -67,9 +67,8 @@ export default function PersonaCard({ persona, response, isLoading }: Props) {
               <span className={`text-[11px] font-bold ${badge.text}`}>{response!.stance}</span>
             </div>
           )}
-          <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5">
-            <span className="text-[9px] text-slate-500">投票率</span>
-            <span className="text-[10px] font-bold text-slate-700">{weightPercent}%</span>
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-50 border border-slate-200" title="投票に行く確率">
+            <span className="text-[10px] font-bold text-slate-700 leading-none">{weightPercent}%</span>
           </div>
         </div>
       </div>

@@ -8,3 +8,45 @@
 @utility animate-fade-in {
   animation: fade-in 0.4s ease forwards;
 }
+
+/* ルート番号フラグマーカー */
+.route-flag-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.route-flag-marker .flag-head {
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  background: #1B2A4A;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  border: 2px solid #fff;
+}
+.route-flag-marker .flag-number {
+  transform: rotate(45deg);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  font-family: system-ui, sans-serif;
+}
+.route-flag-marker .flag-tail {
+  width: 2px;
+  height: 8px;
+  background: #1B2A4A;
+  margin-top: -2px;
+}
+
+/* Leaflet tooltip override for route numbers (remove default styling) */
+.route-number-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
