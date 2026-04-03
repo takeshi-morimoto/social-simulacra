@@ -9,7 +9,6 @@ import type {
   CampaignSpot, CampaignDay, RouteStop, TimeSlot,
 } from "@/lib/types";
 
-// 地域分析・政策テスト関連
 import MunicipalityInput from "@/components/MunicipalityInput";
 import AuthButton from "@/components/AuthButton";
 import DemographicsPanel from "@/components/DemographicsPanel";
@@ -17,46 +16,56 @@ import PersonaList from "@/components/PersonaList";
 import ListenMode from "@/components/ListenMode";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ElectionMap from "@/components/ElectionMap";
-
-// 遊説プラン関連
 import CampaignRouteMap from "@/components/CampaignRouteMap";
 import TimeSlider from "@/components/TimeSlider";
 import SpotList from "@/components/SpotList";
 import DayPlannerBoard from "@/components/DayPlannerBoard";
-import PolicyInsightBanner from "@/components/PolicyInsightBanner";
 import { scoreSpots } from "@/lib/scoring";
 import { optimizeRoute, generateMultiDayPlan, fetchOsrmRoute } from "@/lib/route-optimizer";
 
 const INITIAL_COUNTS: StanceCounts = { "強く賛成": 0, "賛成": 0, "条件付き賛成": 0, "中立": 0, "反対": 0, "強く反対": 0 };
 const INITIAL_CANDIDATE: CandidateProfile = { name: "", party: "", district: "", platform: "" };
 
-type Tab = "analysis" | "policy" | "route";
-const TABS: { key: Tab; label: string }[] = [
-  { key: "analysis", label: "地域分析" },
-  { key: "policy", label: "政策テスト" },
-  { key: "route", label: "遊説プラン" },
-];
+// --- セクション折りたたみ ---
+function Section({ title, step, done, open, onToggle, children }: {
+  title: string; step: number; done: boolean; open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-6">
+      <button onClick={onToggle}
+        className="w-full flex items-center gap-3 bg-white rounded-lg border border-gray-200 shadow-sm px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+          done ? "bg-[#1B2A4A] text-white" : "bg-gray-200 text-gray-500"
+        }`}>
+          {done ? "✓" : step}
+        </div>
+        <span className={`text-sm font-semibold flex-1 ${done ? "text-[#1B2A4A]" : "text-gray-800"}`}>{title}</span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-3 animate-fade-in">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
   const { data: session } = useSession();
 
-  // --- タブ ---
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
-    if (typeof window === "undefined") return "analysis";
-    const param = new URLSearchParams(window.location.search).get("tab");
-    if (param === "policy" || param === "route") return param;
-    return "analysis";
-  });
-
-  const switchTab = useCallback((tab: Tab) => {
-    setActiveTab(tab);
-    window.history.replaceState(null, "", tab === "analysis" ? "/" : `/?tab=${tab}`);
+  // --- セクション開閉 ---
+  const [openSections, setOpenSections] = useState({ analysis: true, policy: false, route: false });
+  const toggleSection = useCallback((key: "analysis" | "policy" | "route") => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
   // --- 共通: 選挙区 ---
   const [municipality, setMunicipality] = useState("");
 
-  // --- 地域分析 / 政策テスト ---
+  // --- 地域分析 ---
   const [personas, setPersonas] = useState<VoterPersona[]>([]);
   const [isGeneratingPersonas, setIsGeneratingPersonas] = useState(false);
   const [demographics, setDemographics] = useState<ElectionDemographicProfile | null>(null);
@@ -68,6 +77,7 @@ export default function Home() {
     return false;
   });
 
+  // --- 政策テスト ---
   const [policy, setPolicy] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [personaResults, setPersonaResults] = useState<Record<number, PersonaResponse | null>>({});
@@ -80,7 +90,7 @@ export default function Home() {
 
   // --- 遊説プラン ---
   const [rawSpots, setRawSpots] = useState<CampaignSpot[]>([]);
-  const [spotsMunicipality, setSpotsMunicipality] = useState(""); // どの選挙区のスポットか
+  const [spotsMunicipality, setSpotsMunicipality] = useState("");
   const [timeSlot, setTimeSlot] = useState<TimeSlot>("morning");
   const [spotsLoading, setSpotsLoading] = useState(false);
   const [spotsError, setSpotsError] = useState("");
@@ -101,6 +111,11 @@ export default function Home() {
     return null;
   }, [days, activeDay]);
 
+  // --- 完了判定 ---
+  const hasPersonas = personas.length > 0 && !isGeneratingPersonas;
+  const hasAnalysis = !!analysis;
+  const hasRoute = days.length > 0;
+
   // --- 候補者プロフィール読み込み ---
   useEffect(() => {
     if (session?.user) {
@@ -116,6 +131,7 @@ export default function Home() {
   }, [session]);
 
   // --- ペルソナ生成 ---
+  const policySectionRef = useRef<HTMLDivElement>(null);
   const generatePersonas = useCallback(async () => {
     const muni = municipality.trim();
     if (!muni) return;
@@ -140,6 +156,9 @@ export default function Home() {
         const data = await res.json();
         setPersonas(data.personas);
         setDemographics(data.demographics);
+        // 次のセクションを開く
+        setOpenSections((prev) => ({ ...prev, policy: true }));
+        setTimeout(() => policySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
       } else {
         alert("ペルソナの生成に失敗しました");
       }
@@ -151,6 +170,7 @@ export default function Home() {
   }, [municipality, candidateProfile]);
 
   // --- 政策シミュレーション ---
+  const routeSectionRef = useRef<HTMLDivElement>(null);
   const runSimulation = useCallback(async () => {
     const pol = policy.trim();
     if (!pol) { alert("公約・政策を入力してください"); return; }
@@ -171,9 +191,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          policy: pol,
-          personas,
-          candidateProfile,
+          policy: pol, personas, candidateProfile,
           customData: customData.trim() ? { text: customData.trim() } : undefined,
         }),
       });
@@ -187,18 +205,11 @@ export default function Home() {
         };
         results[persona.id] = r;
         setPersonaResults((prev) => ({ ...prev, [persona.id]: r }));
-        setStanceCounts((prev) => ({
-          ...prev,
-          [r.stance]: prev[r.stance as Stance] + 1,
-        }));
+        setStanceCounts((prev) => ({ ...prev, [r.stance]: prev[r.stance as Stance] + 1 }));
       }
     } catch {
       for (const persona of personas) {
-        const fallback: PersonaResponse = {
-          opinion: "（通信エラーのため回答を取得できませんでした）",
-          stance: "中立",
-          tags: ["エラー"],
-        };
+        const fallback: PersonaResponse = { opinion: "（通信エラーのため回答を取得できませんでした）", stance: "中立", tags: ["エラー"] };
         results[persona.id] = fallback;
         setPersonaResults((prev) => ({ ...prev, [persona.id]: fallback }));
       }
@@ -221,7 +232,11 @@ export default function Home() {
         body: JSON.stringify({ policy: pol, responseSummary, personas, personaResults: results }),
       });
       if (res.ok) {
-        setAnalysis(await res.json());
+        const analysisData = await res.json();
+        setAnalysis(analysisData);
+        // 次のセクションを開く
+        setOpenSections((prev) => ({ ...prev, route: true }));
+        setTimeout(() => routeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
       }
     } catch { /* Analysis failed silently */ }
 
@@ -277,14 +292,14 @@ export default function Home() {
     }
   }, [municipality]);
 
-  // 遊説プランタブに切り替え時、スポット未取得なら自動取得
+  // 遊説プランセクションが開かれた時にスポット自動取得
   const lastFetchedMuni = useRef("");
   useEffect(() => {
-    if (activeTab === "route" && municipality.trim() && lastFetchedMuni.current !== municipality.trim() && !spotsLoading) {
+    if (openSections.route && municipality.trim() && lastFetchedMuni.current !== municipality.trim() && !spotsLoading) {
       lastFetchedMuni.current = municipality.trim();
       fetchSpots();
     }
-  }, [activeTab, municipality]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openSections.route, municipality]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
@@ -329,14 +344,6 @@ export default function Home() {
     }
   }, [rawSpots, numDays, fetchRouteForDay]);
 
-  const handleRemove = useCallback((dayIndex: number, spotId: string) => {
-    setSelectedIds((prev) => { const next = new Set(prev); next.delete(spotId); return next; });
-    setDays((prev) => prev.map((d, i) =>
-      i === dayIndex ? { ...d, stops: d.stops.filter((s) => s.spotId !== spotId) } : d
-    ));
-    if (dayIndex === activeDay) setRouteGeometry(null);
-  }, [activeDay]);
-
   const handleDayClick = useCallback(async (dayIndex: number) => {
     setActiveDay(dayIndex);
     const day = days[dayIndex];
@@ -363,15 +370,11 @@ export default function Home() {
     finally { setSaving(false); }
   }, [session, municipality, days]);
 
-  // --- 表示判定 ---
-  const hasPersonas = personas.length > 0 && !isGeneratingPersonas;
-  const hasMunicipality = municipality.trim().length > 0;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-baseline gap-4">
             <span className="text-2xl font-black tracking-[0.08em] text-[#1B2A4A]" style={{ fontFamily: "'Noto Serif JP', serif" }}>
               参謀AI
@@ -382,7 +385,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-4 py-6">
         {/* プロフィール未登録バナー */}
         {session && !candidateProfile.name && !candidateProfile.platform && !profileBannerDismissed && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
@@ -395,133 +398,123 @@ export default function Home() {
           </div>
         )}
 
-        {/* 選挙区入力 */}
-        <MunicipalityInput
-          value={municipality}
-          onChange={setMunicipality}
-          isGenerating={isGeneratingPersonas}
-          onGenerate={generatePersonas}
-          hasPersonas={personas.length > 0}
-        />
-
-        {isGeneratingPersonas && (
-          <LoadingOverlay message="有権者ペルソナを生成しています..." estimateSeconds={25} />
-        )}
-
-        {/* タブバー */}
-        {hasMunicipality && (
-          <div className="flex gap-1 border-b border-gray-200 mb-6">
-            {TABS.map((tab) => {
-              const disabled = tab.key === "policy" && !hasPersonas;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => !disabled && switchTab(tab.key)}
-                  disabled={disabled}
-                  className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                    activeTab === tab.key
-                      ? "border-[#1B2A4A] text-[#1B2A4A]"
-                      : disabled
-                        ? "border-transparent text-gray-300 cursor-not-allowed"
-                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ===== 地域分析タブ ===== */}
-        {hasMunicipality && activeTab === "analysis" && (
-          <div className="max-w-[960px] mx-auto">
-            {hasPersonas && demographics && (
-              <DemographicsPanel demographics={demographics} municipality={municipality} />
-            )}
-            <ElectionMap municipality={municipality} />
-            {hasPersonas && <PersonaList personas={personas} />}
-            {!hasPersonas && !isGeneratingPersonas && (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                上の「有権者ペルソナを生成」ボタンを押すと、地域分析が表示されます
+        {/* ステップインジケーター */}
+        <div className="flex items-center gap-0 mb-6 px-2">
+          {[
+            { label: "地域分析", done: hasPersonas },
+            { label: "政策テスト", done: hasAnalysis },
+            { label: "遊説プラン", done: hasRoute },
+          ].map((s, i, arr) => (
+            <div key={s.label} className="flex items-center flex-1">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  s.done ? "bg-[#1B2A4A] text-white" : "bg-gray-200 text-gray-500"
+                }`}>
+                  {s.done ? "✓" : i + 1}
+                </div>
+                <span className={`text-xs font-medium ${s.done ? "text-[#1B2A4A]" : "text-gray-400"}`}>{s.label}</span>
               </div>
+              {i < arr.length - 1 && (
+                <div className={`flex-1 h-px mx-3 ${s.done ? "bg-[#1B2A4A]" : "bg-gray-200"}`} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ===== ① 地域分析 ===== */}
+        <Section title="地域分析" step={1} done={hasPersonas} open={openSections.analysis} onToggle={() => toggleSection("analysis")}>
+          <MunicipalityInput
+            value={municipality}
+            onChange={setMunicipality}
+            isGenerating={isGeneratingPersonas}
+            onGenerate={generatePersonas}
+            hasPersonas={personas.length > 0}
+          />
+
+          {isGeneratingPersonas && (
+            <LoadingOverlay message="有権者ペルソナを生成しています..." estimateSeconds={25} />
+          )}
+
+          {hasPersonas && (
+            <>
+              {demographics && (
+                <DemographicsPanel demographics={demographics} municipality={municipality} />
+              )}
+              <ElectionMap municipality={municipality} />
+              <PersonaList personas={personas} />
+            </>
+          )}
+        </Section>
+
+        {/* ===== ② 政策テスト ===== */}
+        <div ref={policySectionRef}>
+          <Section title="政策テスト" step={2} done={hasAnalysis}
+            open={openSections.policy} onToggle={() => toggleSection("policy")}>
+            {!hasPersonas ? (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                先に地域分析でペルソナを生成してください
+              </div>
+            ) : (
+              <ListenMode
+                municipality={municipality}
+                policy={policy}
+                onPolicyChange={setPolicy}
+                onRun={runSimulation}
+                isRunning={isRunning}
+                personas={personas}
+                personaResults={personaResults}
+                loadingPersonas={loadingPersonas}
+                stanceCounts={stanceCounts}
+                showStanceBar={showStanceBar}
+                analysis={analysis}
+                analysisLoading={analysisLoading}
+                showAnalysis={showAnalysis}
+                candidateProfile={candidateProfile}
+                ageFilter={ageFilter}
+                onAgeFilterChange={setAgeFilter}
+              />
             )}
-          </div>
-        )}
+          </Section>
+        </div>
 
-        {/* ===== 政策テストタブ ===== */}
-        {hasMunicipality && activeTab === "policy" && hasPersonas && (
-          <div className="max-w-[960px] mx-auto">
-            <ListenMode
-              municipality={municipality}
-              policy={policy}
-              onPolicyChange={setPolicy}
-              onRun={runSimulation}
-              isRunning={isRunning}
-              personas={personas}
-              personaResults={personaResults}
-              loadingPersonas={loadingPersonas}
-              stanceCounts={stanceCounts}
-              showStanceBar={showStanceBar}
-              analysis={analysis}
-              analysisLoading={analysisLoading}
-              showAnalysis={showAnalysis}
-              candidateProfile={candidateProfile}
-              ageFilter={ageFilter}
-              onAgeFilterChange={setAgeFilter}
-            />
-          </div>
-        )}
+        {/* ===== ③ 遊説プラン ===== */}
+        <div ref={routeSectionRef}>
+          <Section title="遊説プラン" step={3} done={hasRoute}
+            open={openSections.route} onToggle={() => toggleSection("route")}>
 
-        {/* ===== 遊説プランタブ ===== */}
-        {hasMunicipality && activeTab === "route" && (
-          <>
             {spotsLoading && (
               <LoadingOverlay message="遊説スポットを取得中..." estimateSeconds={5} />
             )}
 
-            {/* 政策シミュレーション連動バナー */}
-            {analysis ? (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-blue-700">
-                    政策テスト結果: 「{policy}」→ 支持率 <span className="font-bold">{analysis.weighted_approval_rate ?? analysis.approval_rate}%</span>
-                    {analysis.recommendations[0] && <span className="ml-2 text-blue-500">— {analysis.recommendations[0]}</span>}
-                  </div>
-                  <button onClick={() => switchTab("policy")} className="text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0 ml-3">
-                    詳細を見る
-                  </button>
+            {/* 政策テスト結果サマリー */}
+            {hasAnalysis && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <div className="text-xs text-blue-700">
+                  テスト政策: 「{policy}」→ 支持率 <span className="font-bold">{analysis!.weighted_approval_rate ?? analysis!.approval_rate}%</span>
+                  {analysis!.recommendations[0] && <span className="ml-2 text-blue-500">— {analysis!.recommendations[0]}</span>}
                 </div>
               </div>
-            ) : (
-              <PolicyInsightBanner municipality={municipality} />
             )}
 
             {/* 自動プラン生成 */}
             {rawSpots.length > 0 && (
-              <div className="bg-gradient-to-r from-[#1B2A4A] to-[#2a3d5c] rounded-lg p-4 mb-6 shadow-sm">
+              <div className="bg-gradient-to-r from-[#1B2A4A] to-[#2a3d5c] rounded-lg p-4 mb-4 shadow-sm">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <div className="text-white text-sm font-semibold">遊説プランを自動生成</div>
                     <div className="text-white/60 text-xs mt-1">
-                      8:00〜20:00（公選法準拠）・朝の駅立ち → 午前遊説 → 昼演説 → 午後遊説 → 夕方演説 → 夜の駅立ち
+                      8:00〜20:00（公選法準拠）
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                    <select
-                      value={numDays}
-                      onChange={(e) => setNumDays(Number(e.target.value))}
-                      className="px-2 py-2 text-sm rounded-lg border-0 bg-white/20 text-white font-bold focus:ring-2 focus:ring-white/50 w-full sm:w-auto"
-                    >
+                    <select value={numDays} onChange={(e) => setNumDays(Number(e.target.value))}
+                      className="px-2 py-2 text-sm rounded-lg border-0 bg-white/20 text-white font-bold focus:ring-2 focus:ring-white/50 w-full sm:w-auto">
                       {Array.from({ length: Math.max(maxDays, 1) }, (_, i) => i + 1).map((n) => (
                         <option key={n} value={n} className="text-gray-800">{n}日間</option>
                       ))}
                     </select>
-                    <button
-                      onClick={handleAutoGenerate}
-                      disabled={generating}
-                      className="px-5 py-2.5 bg-white text-[#1B2A4A] text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 w-full sm:w-auto"
-                    >
+                    <button onClick={handleAutoGenerate} disabled={generating}
+                      className="px-5 py-2.5 bg-white text-[#1B2A4A] text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 w-full sm:w-auto">
                       {generating ? "生成中..." : "自動生成"}
                     </button>
                   </div>
@@ -531,39 +524,33 @@ export default function Home() {
 
             {spotsError && <div className="mb-4 text-xs text-red-500">{spotsError}</div>}
 
-            {/* 地図+時間帯(左) + スポット一覧(右) ホバー連動 */}
+            {/* 地図 + スポット一覧 */}
             {rawSpots.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-4">
                 <div className="flex flex-col lg:flex-row gap-4">
-                  {/* 左: 地図 + 時間帯 + 凡例 */}
                   <div className="lg:w-2/3 flex flex-col">
-                    <div className="flex-1">
-                      <CampaignRouteMap
-                        municipality={municipality}
-                        spots={scoredSpots}
-                        selectedSpotIds={selectedIds}
-                        routeStops={optimized ? activeDayStops : null}
-                        routeGeometry={routeGeometry}
-                        onSpotClick={(spot) => toggleSpot(spot.id)}
-                        hoveredSpotId={hoveredSpotId}
-                        onSpotHover={setHoveredSpotId}
-                      />
-                    </div>
+                    <CampaignRouteMap
+                      municipality={municipality}
+                      spots={scoredSpots}
+                      selectedSpotIds={selectedIds}
+                      routeStops={optimized ? activeDayStops : null}
+                      routeGeometry={routeGeometry}
+                      onSpotClick={(spot) => toggleSpot(spot.id)}
+                      hoveredSpotId={hoveredSpotId}
+                      onSpotHover={setHoveredSpotId}
+                    />
                     <div className="mt-3">
                       <TimeSlider value={timeSlot} onChange={setTimeSlot} />
                     </div>
-                    {scoredSpots.length > 0 && (
-                      <div className="mt-2 flex items-center gap-3 flex-wrap text-[10px] text-gray-500">
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#E74C3C] mr-0.5" />駅</span>
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#27AE60] mr-0.5" />公園</span>
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#9B59B6] mr-0.5" />商業</span>
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#1ABC9C] mr-0.5" />公共</span>
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#3498DB] mr-0.5" />避難</span>
-                        <span><span className="inline-block w-2 h-2 rounded-full bg-[#F39C12] mr-0.5" />LM</span>
-                      </div>
-                    )}
+                    <div className="mt-2 flex items-center gap-3 flex-wrap text-[10px] text-gray-500">
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#E74C3C] mr-0.5" />駅</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#27AE60] mr-0.5" />公園</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#9B59B6] mr-0.5" />商業</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#1ABC9C] mr-0.5" />公共</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#3498DB] mr-0.5" />避難</span>
+                      <span><span className="inline-block w-2 h-2 rounded-full bg-[#F39C12] mr-0.5" />LM</span>
+                    </div>
                   </div>
-                  {/* 右: スポット一覧（左カラムと高さを揃える） */}
                   <div className="lg:w-1/3 relative">
                     <SpotList
                       spots={scoredSpots}
@@ -577,7 +564,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* 遊説プラン日程（カンバンボード） */}
+            {/* カンバンボード */}
             {days.length > 0 && (
               <DayPlannerBoard
                 days={days}
@@ -596,8 +583,8 @@ export default function Home() {
                 onSave={handleSave}
               />
             )}
-          </>
-        )}
+          </Section>
+        </div>
       </main>
 
       <footer className="mt-10 pb-8 text-center text-xs text-gray-400">

@@ -22,7 +22,10 @@ export async function callAnthropic<T>(
         model: MODEL,
         max_tokens: maxTokens ?? 300,
         system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
+        messages: [
+          { role: "user", content: userMessage },
+          { role: "assistant", content: "{" },
+        ],
       }),
     });
 
@@ -36,8 +39,10 @@ export async function callAnthropic<T>(
     }
 
     const data = await res.json();
-    const text: string = data.content?.[0]?.text || "{}";
-    return JSON.parse(text.replace(/```json|```/g, "").trim()) as T;
+    const rawText: string = data.content?.[0]?.text || "}";
+    // prefillで"{"を送っているので、レスポンスの先頭に"{"を付加
+    const text = "{" + rawText.replace(/```json|```/g, "").trim();
+    return JSON.parse(text) as T;
   }
 
   throw new Error("Max retries exceeded");
