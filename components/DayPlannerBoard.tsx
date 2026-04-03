@@ -54,12 +54,20 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
 }
 
 // ===== メインコンポーネント =====
+interface SpotAdviceData {
+  talkPoints: string[];
+  avoidTopics: string[];
+  openingLine: string;
+}
+
 interface Props {
   days: CampaignDay[];
   activeDay: number;
   optimized: boolean;
   availableSpots: CampaignSpot[];
   saving: boolean;
+  spotAdvice?: Record<string, SpotAdviceData>;
+  adviceLoading?: boolean;
   onDaysChange: (days: CampaignDay[]) => void;
   onActiveDayChange: (index: number) => void;
   onOptimize: (dayIndex: number) => void;
@@ -68,6 +76,7 @@ interface Props {
 
 export default function DayPlannerBoard({
   days, activeDay, optimized, availableSpots, saving,
+  spotAdvice, adviceLoading,
   onDaysChange, onActiveDayChange, onOptimize, onSave,
 }: Props) {
   const [activeItem, setActiveItem] = useState<{ label: string; icon: string } | null>(null);
@@ -226,30 +235,47 @@ export default function DayPlannerBoard({
 
                 <div className="flex-1 min-h-[60px] overflow-y-auto max-h-[400px] divide-y divide-gray-50">
                   {day.stops.length === 0 && <div className="p-4 text-center text-[10px] text-gray-300">ドロップして追加</div>}
-                  {day.stops.map((stop, i) => (
+                  {day.stops.map((stop, i) => {
+                    const advice = spotAdvice?.[stop.spotId];
+                    return (
                     <SortableItem key={makeDayItemId(dayIdx, stop.spotId)} id={makeDayItemId(dayIdx, stop.spotId)}>
-                      <div className="flex items-start gap-2 px-2 py-1.5 bg-white cursor-grab active:cursor-grabbing">
-                        <div className="flex flex-col items-center flex-shrink-0">
-                          <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{i + 1}</div>
-                          {i < day.stops.length - 1 && <div className="w-px h-4 bg-gray-200 mt-0.5" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
-                            <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
+                      <div className="px-2 py-1.5 bg-white cursor-grab active:cursor-grabbing">
+                        <div className="flex items-start gap-2">
+                          <div className="flex flex-col items-center flex-shrink-0">
+                            <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{i + 1}</div>
+                            {i < day.stops.length - 1 && <div className="w-px h-4 bg-gray-200 mt-0.5" />}
                           </div>
-                          {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
+                              <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
+                            </div>
+                            {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemove(dayIdx, stop.spotId); }}
+                            className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
+                            onPointerDown={(e) => e.stopPropagation()}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemove(dayIdx, stop.spotId); }}
-                          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
-                          onPointerDown={(e) => e.stopPropagation()}>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                        {/* トーク提案 */}
+                        {advice && (
+                          <div className="ml-7 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                            <div className="text-[9px] text-amber-700 font-medium mb-0.5">💡 訴求ポイント</div>
+                            {advice.talkPoints.map((point, j) => (
+                              <div key={j} className="text-[9px] text-amber-800">・{point}</div>
+                            ))}
+                            {advice.avoidTopics.length > 0 && (
+                              <div className="text-[9px] text-red-500 mt-0.5">⚠ {advice.avoidTopics.join("、")}</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </SortableItem>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {day.stops.length >= 2 && (

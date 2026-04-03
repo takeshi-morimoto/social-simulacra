@@ -6,9 +6,12 @@ export async function callAnthropic<T>(
   systemPrompt: string,
   userMessage: string,
   maxTokens?: number,
+  jsonArrayResponse?: boolean,
 ): Promise<T> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+  const prefill = jsonArrayResponse ? "[" : "{";
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const res = await fetch(API_URL, {
@@ -24,7 +27,7 @@ export async function callAnthropic<T>(
         system: systemPrompt,
         messages: [
           { role: "user", content: userMessage },
-          { role: "assistant", content: "{" },
+          { role: "assistant", content: prefill },
         ],
       }),
     });
@@ -39,9 +42,8 @@ export async function callAnthropic<T>(
     }
 
     const data = await res.json();
-    const rawText: string = data.content?.[0]?.text || "}";
-    // prefillで"{"を送っているので、レスポンスの先頭に"{"を付加
-    const text = "{" + rawText.replace(/```json|```/g, "").trim();
+    const rawText: string = data.content?.[0]?.text || (jsonArrayResponse ? "]" : "}");
+    const text = prefill + rawText.replace(/```json|```/g, "").trim();
     return JSON.parse(text) as T;
   }
 

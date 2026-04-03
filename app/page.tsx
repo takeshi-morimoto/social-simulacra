@@ -103,6 +103,8 @@ export default function Home() {
   const [generating, setGenerating] = useState(false);
   const [numDays, setNumDays] = useState(3);
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
+  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[]; openingLine: string }>>({});
+  const [adviceLoading, setAdviceLoading] = useState(false);
 
   const scoredSpots = useMemo(() => scoreSpots(rawSpots, timeSlot), [rawSpots, timeSlot]);
   const maxDays = useMemo(() => Math.min(Math.floor(rawSpots.length / 5), 14), [rawSpots]);
@@ -328,6 +330,31 @@ export default function Home() {
     if (dayIndex === activeDay) await fetchRouteForDay(optimizedStops);
   }, [days, activeDay, fetchRouteForDay]);
 
+  // スポット別アドバイス取得
+  const fetchSpotAdvice = useCallback(async (planDays: CampaignDay[]) => {
+    if (!analysis || !policy || planDays.length === 0) return;
+    setAdviceLoading(true);
+    try {
+      // アクティブな日のストップに対してアドバイスを取得
+      const allStops = planDays.flatMap((d) => d.stops);
+      const res = await fetch("/api/spot-advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policy,
+          analysisRecommendations: analysis.recommendations,
+          analysisRisks: analysis.risks,
+          stops: allStops.slice(0, 16), // API負荷を考慮して最大16スポット
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSpotAdvice(data.advice || {});
+      }
+    } catch { /* ignore */ }
+    finally { setAdviceLoading(false); }
+  }, [analysis, policy]);
+
   const handleAutoGenerate = useCallback(async () => {
     if (rawSpots.length === 0) return;
     setGenerating(true);
@@ -339,10 +366,12 @@ export default function Home() {
       setActiveDay(0);
       setOptimized(true);
       if (plan.length > 0) await fetchRouteForDay(plan[0].stops);
+      // 政策テスト済みならアドバイス自動取得
+      if (analysis) fetchSpotAdvice(plan);
     } finally {
       setGenerating(false);
     }
-  }, [rawSpots, numDays, fetchRouteForDay]);
+  }, [rawSpots, numDays, fetchRouteForDay, analysis, fetchSpotAdvice]);
 
   const handleDayClick = useCallback(async (dayIndex: number) => {
     setActiveDay(dayIndex);
@@ -572,6 +601,8 @@ export default function Home() {
                 optimized={optimized}
                 availableSpots={scoredSpots}
                 saving={saving}
+                spotAdvice={spotAdvice}
+                adviceLoading={adviceLoading}
                 onDaysChange={(newDays) => {
                   setDays(newDays);
                   const ids = new Set(newDays.flatMap((d) => d.stops.map((s) => s.spotId)));
