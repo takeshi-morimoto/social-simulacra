@@ -127,6 +127,8 @@ export default function Home() {
           if (data) {
             setCandidateProfile({ name: data.name, party: data.party, district: data.district, platform: data.platform });
             if (data.customData) setCustomData(data.customData);
+            // 選挙区が登録済みで、まだ未入力ならデフォルトセット
+            if (data.district && !municipality) setMunicipality(data.district);
           }
         });
     }
@@ -160,12 +162,11 @@ export default function Home() {
         setDemographics(data.demographics);
         // 次のセクションを開く
         setOpenSections((prev) => ({ ...prev, policy: true }));
-        setTimeout(() => policySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
       } else {
-        alert("ペルソナの生成に失敗しました");
+        alert("地域分析に失敗しました");
       }
     } catch {
-      alert("ペルソナの生成に失敗しました");
+      alert("地域分析に失敗しました");
     }
 
     setIsGeneratingPersonas(false);
@@ -238,7 +239,7 @@ export default function Home() {
         setAnalysis(analysisData);
         // 次のセクションを開く
         setOpenSections((prev) => ({ ...prev, route: true }));
-        setTimeout(() => routeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+        // スクロールはしない（ユーザーが自分のペースで進む）
       }
     } catch { /* Analysis failed silently */ }
 
@@ -330,31 +331,6 @@ export default function Home() {
     if (dayIndex === activeDay) await fetchRouteForDay(optimizedStops);
   }, [days, activeDay, fetchRouteForDay]);
 
-  // スポット別アドバイス取得
-  const fetchSpotAdvice = useCallback(async (planDays: CampaignDay[]) => {
-    if (!analysis || !policy || planDays.length === 0) return;
-    setAdviceLoading(true);
-    try {
-      // アクティブな日のストップに対してアドバイスを取得
-      const allStops = planDays.flatMap((d) => d.stops);
-      const res = await fetch("/api/spot-advice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          policy,
-          analysisRecommendations: analysis.recommendations,
-          analysisRisks: analysis.risks,
-          stops: allStops.slice(0, 16), // API負荷を考慮して最大16スポット
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSpotAdvice(data.advice || {});
-      }
-    } catch { /* ignore */ }
-    finally { setAdviceLoading(false); }
-  }, [analysis, policy]);
-
   const handleAutoGenerate = useCallback(async () => {
     if (rawSpots.length === 0) return;
     setGenerating(true);
@@ -366,12 +342,37 @@ export default function Home() {
       setActiveDay(0);
       setOptimized(true);
       if (plan.length > 0) await fetchRouteForDay(plan[0].stops);
-      // 政策テスト済みならアドバイス自動取得
-      if (analysis) fetchSpotAdvice(plan);
     } finally {
       setGenerating(false);
     }
-  }, [rawSpots, numDays, fetchRouteForDay, analysis, fetchSpotAdvice]);
+  }, [rawSpots, numDays, fetchRouteForDay]);
+
+  // 日程＋分析結果が揃ったらスポット別アドバイスを自動取得
+  const adviceFetchedRef = useRef("");
+  useEffect(() => {
+    if (!analysis || !policy || days.length === 0) return;
+    // 同じ組み合わせで再取得しない
+    const key = `${policy}:${days.map((d) => d.stops.map((s) => s.spotId).join(",")).join(";")}`;
+    if (adviceFetchedRef.current === key) return;
+    adviceFetchedRef.current = key;
+
+    setAdviceLoading(true);
+    const allStops = days.flatMap((d) => d.stops);
+    fetch("/api/spot-advice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        policy,
+        analysisRecommendations: analysis.recommendations,
+        analysisRisks: analysis.risks,
+        stops: allStops.slice(0, 16),
+      }),
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data) setSpotAdvice(data.advice || {}); })
+      .catch(() => {})
+      .finally(() => setAdviceLoading(false));
+  }, [analysis, policy, days]);
 
   const handleDayClick = useCallback(async (dayIndex: number) => {
     setActiveDay(dayIndex);
@@ -461,7 +462,7 @@ export default function Home() {
           />
 
           {isGeneratingPersonas && (
-            <LoadingOverlay message="有権者ペルソナを生成しています..." estimateSeconds={25} />
+            <LoadingOverlay message="地域を分析しています..." estimateSeconds={30} />
           )}
 
           {hasPersonas && (

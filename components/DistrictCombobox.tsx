@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import districtMap from "@/lib/district-map.json";
+import { ELECTION_TYPES, getDistrictsForType, type ElectionType } from "@/lib/election-districts";
 
 interface Props {
   value: string;
@@ -10,55 +10,21 @@ interface Props {
   loading?: boolean;
 }
 
-const ALL_DISTRICTS = Object.keys(districtMap as Record<string, unknown>).sort((a, b) => {
-  // 都道府県順 → 区番号順
-  const prefA = a.replace(/第\d+区$/, "");
-  const prefB = b.replace(/第\d+区$/, "");
-  if (prefA !== prefB) return prefA.localeCompare(prefB, "ja");
-  const numA = parseInt(a.match(/第(\d+)区/)?.[1] || "0");
-  const numB = parseInt(b.match(/第(\d+)区/)?.[1] || "0");
-  return numA - numB;
-});
-
-/**
- * 入力テキストを正規化して照合用に変換
- * "栃木2" → "栃木.*2", "東京10区" → "東京.*10.*区"
- */
-function normalizeQuery(input: string): string {
-  return input
-    .replace(/\s+/g, "")
-    .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFFF0 + 0x30)) // 全角→半角数字
-    .replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // 全角→半角英字
-    .replace(/県|都|府|道|第|区/g, ""); // 助詞を除去
-}
-
-function matchDistrict(district: string, query: string): boolean {
-  if (!query) return true;
-  const normalizedDistrict = normalizeQuery(district);
-  const normalizedQuery = normalizeQuery(query);
-
-  // クエリの各文字が順番に含まれるか（あいまいマッチ）
-  let pos = 0;
-  for (const ch of normalizedQuery) {
-    const idx = normalizedDistrict.indexOf(ch, pos);
-    if (idx === -1) return false;
-    pos = idx + 1;
-  }
-  return true;
-}
-
 export default function DistrictCombobox({ value, onChange, onSubmit, loading }: Props) {
+  const [electionType, setElectionType] = useState<ElectionType>("shugi");
+  const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filtered = useMemo(
-    () => ALL_DISTRICTS.filter((d) => matchDistrict(d, value)),
-    [value],
-  );
+  // 外部からvalueが変わったら同期
+  useEffect(() => { setQuery(value); }, [value]);
 
-  // ハイライトが変わったらスクロール追従
+  const filtered = useMemo(() => {
+    return getDistrictsForType(electionType, query).slice(0, 100);
+  }, [electionType, query]);
+
   useEffect(() => {
     if (highlightIndex >= 0 && listRef.current) {
       const el = listRef.current.children[highlightIndex] as HTMLElement;
@@ -66,10 +32,9 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
     }
   }, [highlightIndex]);
 
-  // 外側クリックで閉じる
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.parentElement?.contains(e.target as Node)) {
+      if (inputRef.current && !inputRef.current.closest(".district-combobox")?.contains(e.target as Node)) {
         setOpen(false);
       }
     };
@@ -78,6 +43,7 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
   }, []);
 
   const select = (district: string) => {
+    setQuery(district);
     onChange(district);
     setOpen(false);
     setHighlightIndex(-1);
@@ -98,14 +64,9 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
         select(filtered[highlightIndex]);
       } else if (filtered.length === 1) {
         select(filtered[0]);
-      } else if (value.trim()) {
-        // 完全一致 or 最初の候補を選択
-        const exact = ALL_DISTRICTS.find((d) => d === value.trim());
-        if (exact) {
-          select(exact);
-        } else if (filtered.length > 0) {
-          select(filtered[0]);
-        }
+      } else if (query.trim() && filtered.length > 0) {
+        const exact = filtered.find((d) => d === query.trim());
+        select(exact || filtered[0]);
       }
     } else if (e.key === "Escape") {
       setOpen(false);
@@ -113,47 +74,77 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
     }
   };
 
+  const typeInfo = ELECTION_TYPES.find((t) => t.key === electionType);
+
   return (
-    <div className="relative flex-1">
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
+    <div className="district-combobox flex flex-col sm:flex-row gap-2 flex-1">
+      {/* 選挙種別セレクト */}
+      <select
+        value={electionType}
         onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
+          setElectionType(e.target.value as ElectionType);
+          setQuery("");
+          onChange("");
           setHighlightIndex(-1);
         }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={handleKeyDown}
-        placeholder="選挙区を検索（例: 栃木2、東京10）"
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]"
-      />
-      {open && filtered.length > 0 && (
-        <div
-          ref={listRef}
-          className="absolute z-50 top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
-        >
-          {filtered.map((district, i) => (
-            <button
-              key={district}
-              onClick={() => select(district)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                i === highlightIndex
-                  ? "bg-[#1B2A4A] text-white"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {district}
-            </button>
-          ))}
-        </div>
-      )}
-      {open && filtered.length === 0 && value.trim() && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs text-gray-400 text-center">
-          該当する選挙区が見つかりません
-        </div>
-      )}
+        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A] sm:w-[180px] flex-shrink-0"
+      >
+        {ELECTION_TYPES.map((t) => (
+          <option key={t.key} value={t.key}>{t.label}</option>
+        ))}
+      </select>
+
+      {/* 地域検索 */}
+      <div className="relative flex-1">
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange(e.target.value);
+            setOpen(true);
+            setHighlightIndex(-1);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            electionType === "shugi" ? "例: 栃木4、東京10" :
+            electionType === "sangi" ? "例: 東京、大阪" :
+            electionType === "chiji" ? "例: 東京、北海道" :
+            "例: 夕張、横浜、豊島"
+          }
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B2A4A]/20 focus:border-[#1B2A4A]"
+        />
+        {open && filtered.length > 0 && (
+          <div
+            ref={listRef}
+            className="absolute z-50 top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg"
+          >
+            <div className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+              {typeInfo?.label} — {filtered.length}件{filtered.length >= 100 ? "（上位100件）" : ""}
+            </div>
+            {filtered.map((district, i) => (
+              <button
+                key={district}
+                onClick={() => select(district)}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  i === highlightIndex
+                    ? "bg-[#1B2A4A] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {district}
+              </button>
+            ))}
+          </div>
+        )}
+        {open && query.trim() && filtered.length === 0 && (
+          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs text-gray-400 text-center">
+            該当する選挙区が見つかりません
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -112,7 +112,13 @@ export async function POST(req: NextRequest) {
     ageGroupBreakdown = computed.ageBreakdown;
   }
 
-  const systemPrompt = `あなたは選挙戦略アナリストであり、同時にSNSで話題になるようなキャッチーな一言コメントを作るのが得意です。複数の有権者の意見を分析して、選挙候補者向けの戦略レポートをJSON形式のみで出力してください。
+  // 複数政策を認識
+  const policies = policy.split("\n---\n").filter((p: string) => p.trim());
+  const policyNote = policies.length > 1
+    ? `\n\n注意：候補者は${policies.length}つの政策を掲げています。各政策への反応と全体的なパッケージとしての評価を含めてください。`
+    : "";
+
+  const systemPrompt = `あなたは選挙戦略アナリストであり、同時にSNSで話題になるようなキャッチーな一言コメントを作るのが得意です。複数の有権者の意見を分析して、選挙候補者向けの戦略レポートをJSON形式のみで出力してください。${policyNote}
 
 注意：approval_rateは投票率加重済みの値 ${weightedApprovalRate}% を使ってください。
 

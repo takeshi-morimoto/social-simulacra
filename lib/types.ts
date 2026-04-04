@@ -17,6 +17,7 @@ export interface VoterPersona extends Persona {
   gender: string;
   voterTurnoutWeight: number;
   ageGroup: string;
+  desiredPolicy?: string;
 }
 
 export interface PersonaResponse {

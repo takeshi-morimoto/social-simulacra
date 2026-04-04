@@ -15,6 +15,7 @@ type GeneratedPersona = {
   personality: string;
   concern: string;
   gender: string;
+  desired_policy: string;
 };
 
 type ApiResponse = {
@@ -149,7 +150,7 @@ ${turnoutData.mayor ? `市区町村長選: ${turnoutData.mayor}%` : ""}
     ]
   },
   "personas": [
-    {"name":"フルネーム","age":数値,"role":"職業・立場（10文字以内）","gender":"男性または女性","detail":"具体的な背景（80文字以内）","personality":"性格・価値観（30文字以内）","concern":"今一番の関心事（30文字以内）"},
+    {"name":"フルネーム","age":数値,"role":"職業・立場（10文字以内）","gender":"男性または女性","detail":"具体的な背景（80文字以内）","personality":"性格・価値観（30文字以内）","concern":"今一番の関心事（30文字以内）","desired_policy":"候補者に一番やってほしい政策（30文字以内、具体的に）"},
     ...15人分
   ]
 }`;
@@ -177,6 +178,7 @@ ${turnoutData.mayor ? `市区町村長選: ${turnoutData.mayor}%` : ""}
         detail: g.detail,
         personality: g.personality,
         concern: g.concern,
+        desiredPolicy: g.desired_policy || "",
         gender: g.gender || "不明",
         ageGroup,
         voterTurnoutWeight: weight,

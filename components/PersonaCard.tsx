@@ -67,7 +67,8 @@ export default function PersonaCard({ persona, response, isLoading }: Props) {
               <span className={`text-[11px] font-bold ${badge.text}`}>{response!.stance}</span>
             </div>
           )}
-          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-50 border border-slate-200" title="投票に行く確率">
+          <div className="flex flex-col items-center justify-center h-8 rounded-full bg-slate-50 border border-slate-200 px-2" title="投票に行く確率">
+            <span className="text-[6px] text-slate-400 leading-none">投票確率</span>
             <span className="text-[10px] font-bold text-slate-700 leading-none">{weightPercent}%</span>
           </div>
         </div>
@@ -93,6 +94,11 @@ export default function PersonaCard({ persona, response, isLoading }: Props) {
             <span className="rounded bg-purple-50 border border-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">{persona.personality}</span>
             <span className="rounded bg-teal-50 border border-teal-100 px-1.5 py-0.5 text-[10px] text-teal-700">{persona.concern}</span>
           </div>
+          {persona.desiredPolicy && (
+            <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-1.5 py-1">
+              💬 {persona.desiredPolicy}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CandidateProfile } from "@/lib/types";
+import DistrictCombobox from "./DistrictCombobox";
 
 interface Props {
   profile: CandidateProfile;
@@ -38,12 +39,10 @@ export default function CandidateProfileInput({ profile, onChange }: Props) {
         </div>
         <div>
           <label className="block text-[11px] text-gray-500 mb-1">選挙区</label>
-          <input
-            type="text"
+          <DistrictCombobox
             value={profile.district}
-            onChange={(e) => update("district", e.target.value)}
-            placeholder="例：東京都第10区"
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-[#1B2A4A] focus:border-[#1B2A4A] placeholder:text-gray-400"
+            onChange={(v) => update("district", v)}
+            onSubmit={(v) => update("district", v)}
           />
         </div>
       </div>
