@@ -278,46 +278,50 @@ export default function DayPlannerBoard({
         </div>
       )}
 
-      {/* アクティブな日の訴求ポイント */}
-      {days[activeDay] && days[activeDay].stops.length > 0 && (spotAdvice && Object.keys(spotAdvice).length > 0 || adviceLoading) && (
-        <div className="mt-4 bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="px-1.5 py-0.5 bg-[#1B2A4A] text-white text-[9px] font-bold rounded">
-              {days[activeDay].dayNumber}日目
-            </span>
-            <span className="text-sm font-semibold text-gray-800">訴求ポイント</span>
-            {adviceLoading && <span className="text-[10px] text-gray-400 animate-pulse">生成中...</span>}
-          </div>
-          <div className="space-y-3">
-            {days[activeDay].stops.map((stop, i) => {
-              const advice = spotAdvice?.[stop.spotId];
-              return (
-                <div key={stop.spotId} className="flex gap-3">
-                  <div className="flex-shrink-0 flex items-start gap-2 w-[140px]">
-                    <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">{i + 1}</div>
-                    <div className="min-w-0">
-                      <div className="text-xs text-gray-800 truncate">{SPOT_ICONS[stop.spot.type]} {stop.spot.name}</div>
-                      {stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime}</div>}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    {!advice && adviceLoading && <div className="text-[10px] text-gray-300 animate-pulse">生成中...</div>}
-                    {advice && (
-                      <div>
-                        {advice.talkPoints.map((point, j) => (
-                          <div key={j} className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-1">💡 {point}</div>
-                        ))}
-                        {advice.avoidTopics.length > 0 && (
-                          <div className="text-xs text-red-500 bg-red-50 rounded px-2 py-1">⚠ {advice.avoidTopics.join("、")}</div>
-                        )}
+      {/* 全日程の訴求ポイント */}
+      {days.length > 0 && (spotAdvice && Object.keys(spotAdvice).length > 0 || adviceLoading) && (
+        <div className="mt-4 space-y-4">
+          {days.map((day) => (
+            <div key={day.dayNumber} className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-1.5 py-0.5 bg-[#1B2A4A] text-white text-[9px] font-bold rounded">
+                  {day.dayNumber}日目
+                </span>
+                <span className="text-sm font-semibold text-gray-800">訴求ポイント</span>
+                {adviceLoading && <span className="text-[10px] text-gray-400 animate-pulse">生成中...</span>}
+              </div>
+              <div className="space-y-3">
+                {day.stops.map((stop, i) => {
+                  const advice = spotAdvice?.[stop.spotId];
+                  return (
+                    <div key={stop.spotId} className="flex gap-3">
+                      <div className="flex-shrink-0 flex items-start gap-2 w-[140px]">
+                        <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">{i + 1}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs text-gray-800 truncate">{SPOT_ICONS[stop.spot.type]} {stop.spot.name}</div>
+                          {stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime}</div>}
+                        </div>
                       </div>
-                    )}
-                    {!advice && !adviceLoading && <div className="text-[10px] text-gray-300">—</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      <div className="flex-1">
+                        {!advice && adviceLoading && <div className="text-[10px] text-gray-300 animate-pulse">生成中...</div>}
+                        {advice && (
+                          <div>
+                            {advice.talkPoints.map((point, j) => (
+                              <div key={j} className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-1">💡 {point}</div>
+                            ))}
+                            {advice.avoidTopics.length > 0 && (
+                              <div className="text-xs text-red-500 bg-red-50 rounded px-2 py-1">⚠ {advice.avoidTopics.join("、")}</div>
+                            )}
+                          </div>
+                        )}
+                        {!advice && !adviceLoading && <div className="text-[10px] text-gray-300">—</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -85,8 +85,9 @@ const DAY_TEMPLATE: TimeBlock[] = [
   { label: "午前の遊説", startMinute: 9.5 * 60, endMinute: 11.5 * 60, preferredTypes: ["public_hall", "shelter", "shopping"], count: 2, dwell: DEFAULT_DWELL_MINUTES },
   { label: "昼の街頭演説", startMinute: 12 * 60, endMinute: 13.5 * 60, preferredTypes: ["shopping", "landmark", "park"], count: 1, dwell: DEFAULT_DWELL_MINUTES },
   { label: "午後の遊説", startMinute: 14 * 60, endMinute: 16.5 * 60, preferredTypes: ["park", "public_hall", "shelter", "shopping"], count: 2, dwell: DEFAULT_DWELL_MINUTES },
-  { label: "夕方の街頭演説", startMinute: 17 * 60, endMinute: 18 * 60, preferredTypes: ["shopping", "landmark", "station"], count: 1, dwell: DEFAULT_DWELL_MINUTES },
-  { label: "夜の駅立ち", startMinute: 18.5 * 60, endMinute: 20 * 60, preferredTypes: ["station"], count: 1, dwell: STATION_DWELL_MINUTES },
+  { label: "夕方の遊説", startMinute: 16.5 * 60, endMinute: 18 * 60, preferredTypes: ["shopping", "landmark", "park"], count: 2, dwell: DEFAULT_DWELL_MINUTES },
+  { label: "夜の駅立ち", startMinute: 18.5 * 60, endMinute: 19.5 * 60, preferredTypes: ["station"], count: 1, dwell: STATION_DWELL_MINUTES },
+  { label: "最終の街頭演説", startMinute: 19 * 60, endMinute: 20 * 60, preferredTypes: ["station", "shopping"], count: 1, dwell: DEFAULT_DWELL_MINUTES },
 ];
 
 /**
