@@ -754,6 +754,33 @@ export default function Home() {
         </div>
       </main>
 
+      {/* 全ステップ完了カード */}
+      {hasPersonas && hasAnalysis && hasRoute && Object.keys(spotAdvice).length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 mt-8 mb-4">
+          <div className="bg-gradient-to-r from-[#1B2A4A] to-[#2a3d5c] rounded-lg p-6 shadow-lg text-center">
+            <div className="text-2xl mb-2">🎉</div>
+            <div className="text-white text-lg font-bold mb-1">準備完了！</div>
+            <div className="text-white/70 text-sm mb-4">
+              地域分析・政策テスト・遊説プラン・訴求ポイントがすべて揃いました。あとは遊説するだけです。
+            </div>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <div className="bg-white/10 rounded-lg px-4 py-2">
+                <div className="text-white/50 text-[10px]">日程</div>
+                <div className="text-white font-bold">{days.length}日間</div>
+              </div>
+              <div className="bg-white/10 rounded-lg px-4 py-2">
+                <div className="text-white/50 text-[10px]">スポット</div>
+                <div className="text-white font-bold">{days.reduce((s, d) => s + d.stops.length, 0)}箇所</div>
+              </div>
+              <div className="bg-white/10 rounded-lg px-4 py-2">
+                <div className="text-white/50 text-[10px]">推定支持率</div>
+                <div className="text-white font-bold">{analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="mt-10 pb-8 text-center text-xs text-gray-400">
         Produced by KOIKOI, Inc.
       </footer>
