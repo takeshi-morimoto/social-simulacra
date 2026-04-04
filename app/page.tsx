@@ -99,7 +99,10 @@ export default function Home() {
   const [spotsLoading, setSpotsLoading] = useState(false);
   const [spotsError, setSpotsError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [days, setDays] = useState<CampaignDay[]>([]);
+  const [days, setDays] = useState<CampaignDay[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("sanbo_days") || "[]"); } catch { return []; }
+  });
   const [activeDay, setActiveDay] = useState(0);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][] | null>(null);
   const [optimized, setOptimized] = useState(false);
@@ -107,7 +110,10 @@ export default function Home() {
   const [generating, setGenerating] = useState(false);
   const [numDays, setNumDays] = useState(3);
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
-  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>({});
+  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("sanbo_spotAdvice") || "{}"); } catch { return {}; }
+  });
   const [adviceLoading, setAdviceLoading] = useState(false);
 
   const scoredSpots = useMemo(() => scoreSpots(rawSpots, timeSlot), [rawSpots, timeSlot]);
@@ -309,6 +315,21 @@ export default function Home() {
   useEffect(() => {
     if (policy) localStorage.setItem("sanbo_policy", policy);
   }, [policy]);
+
+  // 訴求ポイント・日程をlocalStorageに保存
+  useEffect(() => {
+    if (Object.keys(spotAdvice).length > 0) {
+      localStorage.setItem("sanbo_spotAdvice", JSON.stringify(spotAdvice));
+    }
+  }, [spotAdvice]);
+
+  useEffect(() => {
+    if (days.length > 0) {
+      localStorage.setItem("sanbo_days", JSON.stringify(days));
+      const ids = new Set(days.flatMap((d) => d.stops.map((s) => s.spotId)));
+      setSelectedIds(ids);
+    }
+  }, [days]);
 
   // （シミュレーション結果は上のcacheSetで保存済み）
 
