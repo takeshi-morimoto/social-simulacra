@@ -6,6 +6,7 @@ import {
   DragOverlay,
   pointerWithin,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -20,6 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import type { CampaignDay, CampaignSpot, RouteStop } from "@/lib/types";
 import { calculateTotalDistance, calculateTotalTravelTime } from "@/lib/route-optimizer";
+import PrintRoute from "@/components/PrintRoute";
 
 const SPOT_ICONS: Record<string, string> = {
   station: "🚉", park: "🌳", shelter: "🏛️", landmark: "📍", shopping: "🛒", public_hall: "🏢",
@@ -59,6 +61,7 @@ interface Props {
   spotAdvice?: Record<string, SpotAdviceData>;
   adviceLoading?: boolean;
   hasAnalysis?: boolean;
+  municipality?: string;
   onGenerateAdvice?: () => void;
   onDaysChange: (days: CampaignDay[]) => void;
   onActiveDayChange: (index: number) => void;
@@ -68,11 +71,14 @@ interface Props {
 
 export default function DayPlannerBoard({
   days, activeDay, optimized, availableSpots, saving,
-  spotAdvice, adviceLoading, hasAnalysis, onGenerateAdvice,
+  spotAdvice, adviceLoading, hasAnalysis, municipality, onGenerateAdvice,
   onDaysChange, onActiveDayChange, onOptimize, onSave,
 }: Props) {
   const [activeItem, setActiveItem] = useState<{ label: string; icon: string } | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
 
   const usedIds = new Set(days.flatMap((d) => d.stops.map((s) => s.spotId)));
   const unusedSpots = availableSpots.filter((s) => !usedIds.has(s.id));
@@ -172,9 +178,9 @@ export default function DayPlannerBoard({
           </button>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory sm:snap-none">
           {/* 未配置スポット */}
-          <div className="flex flex-col bg-gray-50 rounded-lg border border-dashed border-gray-300 flex-1 min-w-[160px]">
+          <div className="flex flex-col bg-gray-50 rounded-lg border border-dashed border-gray-300 flex-1 min-w-[200px] snap-start">
             <div className="p-2 border-b border-gray-200">
               <div className="text-[10px] font-semibold text-gray-600">
                 未配置 <span className="text-gray-400 font-normal">{unusedSpots.length}</span>
@@ -184,7 +190,7 @@ export default function DayPlannerBoard({
               {unusedSpots.length === 0 && <div className="p-3 text-[10px] text-gray-300 text-center">全て配置済み</div>}
               {unusedSpots.slice(0, 50).map((spot) => (
                 <SortableItem key={makePoolItemId(spot.id)} id={makePoolItemId(spot.id)}>
-                  <div className="flex items-center gap-2 px-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-gray-100">
+                  <div className="flex items-center gap-2 px-2 py-2 cursor-grab active:cursor-grabbing hover:bg-gray-100">
                     <span className="text-xs">{SPOT_ICONS[spot.type]}</span>
                     <span className="text-xs text-gray-700 truncate flex-1">{spot.name}</span>
                     <span className="text-[9px] text-gray-400 flex-shrink-0">{spot.score}</span>
@@ -202,7 +208,7 @@ export default function DayPlannerBoard({
 
             return (
               <div key={day.dayNumber}
-                className={`flex flex-col bg-white rounded-lg border-2 shadow-sm flex-1 min-w-[160px] transition-colors ${
+                className={`flex flex-col bg-white rounded-lg border-2 shadow-sm flex-1 min-w-[200px] snap-start transition-colors ${
                   isActive ? "border-[#1B2A4A] ring-1 ring-[#1B2A4A]/20" : "border-gray-200 hover:border-gray-300"
                 }`}>
                 <div className="p-2 border-b border-gray-100 cursor-pointer" onClick={() => onActiveDayChange(dayIdx)}>
@@ -217,7 +223,7 @@ export default function DayPlannerBoard({
                   {day.stops.length === 0 && <div className="p-4 text-center text-[10px] text-gray-300">ドロップして追加</div>}
                   {day.stops.map((stop, i) => (
                     <SortableItem key={makeDayItemId(dayIdx, stop.spotId)} id={makeDayItemId(dayIdx, stop.spotId)}>
-                      <div className="flex items-start gap-2 px-2 py-1.5 bg-white cursor-grab active:cursor-grabbing">
+                      <div className="flex items-start gap-2 px-2 py-2 bg-white cursor-grab active:cursor-grabbing">
                         <div className="flex flex-col items-center flex-shrink-0">
                           <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{i + 1}</div>
                           {i < day.stops.length - 1 && <div className="w-px h-4 bg-gray-200 mt-0.5" />}
@@ -230,9 +236,9 @@ export default function DayPlannerBoard({
                           {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
                         </div>
                         <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemove(dayIdx, stop.spotId); }}
-                          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
+                          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-1.5"
                           onPointerDown={(e) => e.stopPropagation()}>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>

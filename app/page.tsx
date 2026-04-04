@@ -304,18 +304,19 @@ export default function Home() {
 
   // （シミュレーション結果は上のcacheSetで保存済み）
 
-  // --- スポット取得（キャッシュ対応） ---
+  // --- スポット取得（キャッシュ対応・リトライあり） ---
   const fetchSpots = useCallback(async () => {
     const target = municipality.trim();
-    console.log("[fetchSpots] target:", target);
     if (!target) return;
+
+    // エラー状態をクリア
+    setSpotsError("");
 
     // キャッシュ確認
     const cached = cacheGet<CampaignSpot[]>("spots", target);
-    console.log("[fetchSpots] cache:", cached ? `${cached.length} spots` : "miss");
     if (cached && cached.length > 0) {
+      console.log("[fetchSpots] cache hit:", cached.length, "spots for", target);
       setRawSpots(cached);
-      setSpotsError("");
       setSelectedIds(new Set());
       setDays([]);
       setActiveDay(0);
@@ -327,7 +328,6 @@ export default function Home() {
     }
 
     setSpotsLoading(true);
-    setSpotsError("");
     setRawSpots([]);
     setSelectedIds(new Set());
     setDays([]);
@@ -335,13 +335,25 @@ export default function Home() {
     setRouteGeometry(null);
     setOptimized(false);
 
-    try {
+    const attemptFetch = async (): Promise<CampaignSpot[] | null> => {
       const res = await fetch(`/api/plateau-spots?municipality=${encodeURIComponent(target)}`);
       const data = await res.json();
-      console.log("[fetchSpots] API response:", data.spots?.length ?? 0, "spots, error:", data.error, "message:", data.message);
-      if (data.spots && data.spots.length > 0) {
-        setRawSpots(data.spots);
-        cacheSet("spots", target, data.spots, 7);
+      console.log("[fetchSpots] API response:", data.spots?.length ?? 0, "spots for", target);
+      if (data.spots && data.spots.length > 0) return data.spots;
+      return null;
+    };
+
+    try {
+      let spots = await attemptFetch();
+      // リトライ: 空の場合は2秒後に1回だけ再試行
+      if (!spots) {
+        console.log("[fetchSpots] empty result, retrying in 2s...");
+        await new Promise((r) => setTimeout(r, 2000));
+        spots = await attemptFetch();
+      }
+      if (spots) {
+        setRawSpots(spots);
+        cacheSet("spots", target, spots, 7);
       } else {
         setSpotsError("この地域のスポットデータが見つかりませんでした。");
       }
@@ -350,7 +362,6 @@ export default function Home() {
     } finally {
       setSpotsLoading(false);
     }
-    // 成功・失敗に関わらず記録（失敗時はrawSpotsが空のまま）
     setSpotsMunicipality(target);
   }, [municipality]);
 
@@ -365,12 +376,10 @@ export default function Home() {
 
   // 遊説プランセクションが開いているのにスポットがない場合に取得
   useEffect(() => {
-    console.log("[spots-effect] route:", openSections.route, "muni:", municipality, "spots:", rawSpots.length, "loading:", spotsLoading, "error:", spotsError);
-    if (openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading && !spotsError) {
-      console.log("[spots-effect] calling fetchSpots");
+    if (openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading) {
       fetchSpots();
     }
-  }, [openSections.route, municipality, rawSpots.length, spotsLoading, spotsError, fetchSpots]);
+  }, [openSections.route, municipality, rawSpots.length, spotsLoading, fetchSpots]);
 
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
@@ -635,7 +644,18 @@ export default function Home() {
               </div>
             )}
 
-            {spotsError && <div className="mb-4 text-xs text-red-500">{spotsError}</div>}
+            {spotsError && (
+              <div className="mb-4 flex items-center gap-3">
+                <span className="text-xs text-red-500">{spotsError}</span>
+                <button
+                  onClick={() => { setSpotsError(""); fetchSpots(); }}
+                  disabled={spotsLoading}
+                  className="px-3 py-1 text-xs font-semibold bg-[#1B2A4A] text-white rounded hover:bg-[#2a3d6a] transition-colors disabled:opacity-50"
+                >
+                  {spotsLoading ? "取得中..." : "再取得"}
+                </button>
+              </div>
+            )}
 
             {/* 地図 + スポット一覧 */}
             {rawSpots.length > 0 && (
@@ -688,6 +708,7 @@ export default function Home() {
                 spotAdvice={spotAdvice}
                 adviceLoading={adviceLoading}
                 hasAnalysis={hasAnalysis}
+                municipality={municipality}
                 onGenerateAdvice={generateAdvice}
                 onDaysChange={(newDays) => {
                   setDays(newDays);
