@@ -415,15 +415,12 @@ export default function Home() {
     }
   }, [rawSpots, numDays, fetchRouteForDay]);
 
-  // 日程＋分析結果が揃ったらスポット別アドバイスを自動取得（キャッシュ対応）
-  const adviceFetchedRef = useRef("");
-  const daysStopIds = useMemo(() => days.flatMap((d) => d.stops.map((s) => s.spotId)).sort().join(","), [days]);
+  // 訴求ポイント生成（ボタン押下時に実行）
+  const generateAdvice = useCallback(async () => {
+    if (!analysis || !policy || days.length === 0) return;
 
-  useEffect(() => {
-    if (!analysis || !policy || days.length === 0 || daysStopIds === "") return;
+    const daysStopIds = days.flatMap((d) => d.stops.map((s) => s.spotId)).sort().join(",");
     const key = `${policyKey(policy)}:${daysStopIds}`;
-    if (adviceFetchedRef.current === key) return;
-    adviceFetchedRef.current = key;
 
     // キャッシュ確認
     const cached = cacheGet<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>("advice", key);
@@ -435,28 +432,28 @@ export default function Home() {
     setAdviceLoading(true);
     setSpotAdvice({});
     const allStops = days.flatMap((d) => d.stops);
-    fetch("/api/spot-advice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        policy,
-        analysisRecommendations: analysis.recommendations,
-        analysisRisks: analysis.risks,
-        stops: allStops.slice(0, 24),
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        const advice = data.advice || {};
-        setSpotAdvice(advice);
-        if (Object.keys(advice).length > 0) cacheSet("advice", key, advice, 3);
-      })
-      .catch((e) => { console.error("spot-advice error:", e); })
-      .finally(() => setAdviceLoading(false));
-  }, [analysis, policy, daysStopIds]); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const res = await fetch("/api/spot-advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policy,
+          analysisRecommendations: analysis.recommendations,
+          analysisRisks: analysis.risks,
+          stops: allStops,
+        }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      const advice = data.advice || {};
+      setSpotAdvice(advice);
+      if (Object.keys(advice).length > 0) cacheSet("advice", key, advice, 3);
+    } catch (e) {
+      console.error("spot-advice error:", e);
+    } finally {
+      setAdviceLoading(false);
+    }
+  }, [analysis, policy, days]);
 
   const handleDayClick = useCallback(async (dayIndex: number) => {
     setActiveDay(dayIndex);
@@ -690,6 +687,8 @@ export default function Home() {
                 saving={saving}
                 spotAdvice={spotAdvice}
                 adviceLoading={adviceLoading}
+                hasAnalysis={hasAnalysis}
+                onGenerateAdvice={generateAdvice}
                 onDaysChange={(newDays) => {
                   setDays(newDays);
                   const ids = new Set(newDays.flatMap((d) => d.stops.map((s) => s.spotId)));

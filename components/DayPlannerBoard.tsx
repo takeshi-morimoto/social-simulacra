@@ -5,11 +5,15 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -26,13 +30,9 @@ const SPOT_ICONS: Record<string, string> = {
 };
 const DEFAULT_DWELL = 30;
 
-// ===== ユニークID生成 =====
-// 日のストップ: "d{dayIdx}-{spotId}" (例: "d0-abc123", "d1-abc123" → 重複OK)
-// 未配置プール: "pool-{spotId}"
 function makeDayItemId(dayIdx: number, spotId: string) { return `d${dayIdx}-${spotId}`; }
 function makePoolItemId(spotId: string) { return `pool-${spotId}`; }
 
-// IDからパース
 function parseId(id: string): { type: "day"; dayIdx: number; spotId: string } | { type: "pool"; spotId: string } | null {
   const dayMatch = id.match(/^d(\d+)-(.+)$/);
   if (dayMatch) return { type: "day", dayIdx: parseInt(dayMatch[1]), spotId: dayMatch[2] };
@@ -41,23 +41,71 @@ function parseId(id: string): { type: "day"; dayIdx: number; spotId: string } | 
   return null;
 }
 
-// --- ソート可能アイテム（アイテム全体がドラッグハンドル） ---
+// --- ソート可能アイテム ---
 function SortableItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
-      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
-      className="touch-none">
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`touch-none ${isDragging ? "opacity-20 bg-blue-50 border border-dashed border-blue-300 rounded" : ""}`}>
+      {isDragging ? <div className="h-8" /> : children}
+    </div>
+  );
+}
+
+// --- ドロップゾーン ---
+function DropZone({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`${className || ""} ${isOver ? "ring-2 ring-blue-300 ring-inset bg-blue-50/30" : ""} transition-all`}>
       {children}
     </div>
   );
 }
 
-// ===== メインコンポーネント =====
-interface SpotAdviceData {
-  talkPoints: string[];
-  avoidTopics: string[];
+// --- カードの中身（通常表示＆オーバーレイ共用） ---
+function StopCard({ stop, index, optimized, onRemove, isOverlay }: {
+  stop: RouteStop; index: number; optimized: boolean; onRemove?: () => void; isOverlay?: boolean;
+}) {
+  return (
+    <div className={`flex items-start gap-1.5 px-2 py-1.5 bg-white ${isOverlay ? "shadow-xl border-2 border-[#1B2A4A] rounded-lg scale-105" : "cursor-grab active:cursor-grabbing hover:bg-gray-50"} transition-colors`}>
+      <span className="text-[10px] text-gray-300 mt-1 select-none">⠿</span>
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{index + 1}</div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
+          <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
+        </div>
+        {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
+      </div>
+      {onRemove && !isOverlay && (
+        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(); }}
+          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
+          onPointerDown={(e) => e.stopPropagation()}>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 }
+
+function PoolCard({ spot, isOverlay }: { spot: CampaignSpot; isOverlay?: boolean }) {
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-1.5 ${isOverlay ? "bg-white shadow-xl border-2 border-[#1B2A4A] rounded-lg scale-105" : "cursor-grab active:cursor-grabbing hover:bg-gray-100"}`}>
+      <span className="text-[10px] text-gray-300 select-none">⠿</span>
+      <span className="text-xs">{SPOT_ICONS[spot.type]}</span>
+      <span className="text-xs text-gray-700 truncate flex-1">{spot.name}</span>
+      <span className="text-[9px] text-gray-400 flex-shrink-0">{spot.score}</span>
+    </div>
+  );
+}
+
+// --- 型定義 ---
+interface SpotAdviceData { talkPoints: string[]; avoidTopics: string[]; }
 
 interface Props {
   days: CampaignDay[];
@@ -67,52 +115,105 @@ interface Props {
   saving: boolean;
   spotAdvice?: Record<string, SpotAdviceData>;
   adviceLoading?: boolean;
+  hasAnalysis?: boolean;
+  onGenerateAdvice?: () => void;
   onDaysChange: (days: CampaignDay[]) => void;
   onActiveDayChange: (index: number) => void;
   onOptimize: (dayIndex: number) => void;
   onSave: () => void;
 }
 
+type DragItem = { type: "stop"; stop: RouteStop; dayIdx: number; index: number }
+  | { type: "pool"; spot: CampaignSpot };
+
 export default function DayPlannerBoard({
   days, activeDay, optimized, availableSpots, saving,
-  spotAdvice, adviceLoading,
+  spotAdvice, adviceLoading, hasAnalysis, onGenerateAdvice,
   onDaysChange, onActiveDayChange, onOptimize, onSave,
 }: Props) {
-  const [activeItem, setActiveItem] = useState<{ label: string; icon: string } | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [dragItem, setDragItem] = useState<DragItem | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const usedIds = new Set(days.flatMap((d) => d.stops.map((s) => s.spotId)));
   const unusedSpots = availableSpots.filter((s) => !usedIds.has(s.id));
 
-  // 全アイテムのID（1つのSortableContextで管理）
+  // 全アイテムを1つのSortableContextで管理（ドラッグ中の移動を可能に）
   const allIds: string[] = [
     ...unusedSpots.map((s) => makePoolItemId(s.id)),
     ...days.flatMap((day, dayIdx) => day.stops.map((s) => makeDayItemId(dayIdx, s.spotId))),
   ];
+
+  // カスタムコリジョン: まずどのカラム(DropZone)にポインタがあるか判定し、
+  // そのカラム内のアイテムだけでclosestCenterを実行
+  const customCollision: CollisionDetection = useCallback((args) => {
+    // DropZone（カラム）に対してpointerWithinで判定
+    const dropZoneIds = ["zone-pool", ...days.map((_, i) => `zone-day-${i}`)];
+    const zoneContainers = args.droppableContainers.filter((c) => dropZoneIds.includes(String(c.id)));
+    const zoneHits = pointerWithin({ ...args, droppableContainers: zoneContainers });
+
+    if (zoneHits.length > 0) {
+      const zoneId = String(zoneHits[0].id);
+      // そのゾーン内のアイテムだけでclosestCenter
+      let itemPrefix: string;
+      if (zoneId === "zone-pool") {
+        itemPrefix = "pool-";
+      } else {
+        const dayIdx = zoneId.replace("zone-day-", "");
+        itemPrefix = `d${dayIdx}-`;
+      }
+      const zoneItems = args.droppableContainers.filter((c) => String(c.id).startsWith(itemPrefix));
+      if (zoneItems.length > 0) {
+        const itemHits = closestCenter({ ...args, droppableContainers: zoneItems });
+        if (itemHits.length > 0) return itemHits;
+      }
+      // ゾーン内にアイテムがない場合、ゾーン自体を返す（空カラムへのドロップ）
+      return zoneHits;
+    }
+
+    // ゾーンにヒットしない場合はrectIntersectionでフォールバック
+    return rectIntersection(args);
+  }, [days]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
     const parsed = parseId(String(e.active.id));
     if (!parsed) return;
     if (parsed.type === "pool") {
       const spot = availableSpots.find((s) => s.id === parsed.spotId);
-      if (spot) setActiveItem({ label: spot.name, icon: SPOT_ICONS[spot.type] || "📍" });
+      if (spot) setDragItem({ type: "pool", spot });
     } else {
-      const stop = days[parsed.dayIdx]?.stops.find((s) => s.spotId === parsed.spotId);
-      if (stop) setActiveItem({ label: stop.spot.name, icon: SPOT_ICONS[stop.spot.type] || "📍" });
+      const day = days[parsed.dayIdx];
+      const idx = day?.stops.findIndex((s) => s.spotId === parsed.spotId) ?? -1;
+      const stop = day?.stops[idx];
+      if (stop) setDragItem({ type: "stop", stop, dayIdx: parsed.dayIdx, index: idx });
     }
   }, [days, availableSpots]);
 
+  // overIdからコンテナ（日のインデックスまたは"pool"）を特定
+  const getContainer = useCallback((id: string): { type: "pool" } | { type: "day"; dayIdx: number } | null => {
+    if (id === "zone-pool" || id.startsWith("pool-")) return { type: "pool" };
+    const zoneMatch = id.match(/^zone-day-(\d+)$/);
+    if (zoneMatch) return { type: "day", dayIdx: parseInt(zoneMatch[1]) };
+    const parsed = parseId(id);
+    if (parsed?.type === "day") return { type: "day", dayIdx: parsed.dayIdx };
+    if (parsed?.type === "pool") return { type: "pool" };
+    return null;
+  }, []);
+
   const handleDragEnd = useCallback((e: DragEndEvent) => {
-    setActiveItem(null);
+    setDragItem(null);
     const { active, over } = e;
     if (!over || active.id === over.id) return;
 
     const from = parseId(String(active.id));
-    const to = parseId(String(over.id));
-    if (!from || !to) return;
+    if (!from) return;
 
-    // ===== 同じ日の中で並べ替え =====
-    if (from.type === "day" && to.type === "day" && from.dayIdx === to.dayIdx) {
+    const toC = getContainer(String(over.id));
+    if (!toC) return;
+
+    const to = parseId(String(over.id));
+
+    // === 同じ日の中で並べ替え ===
+    if (from.type === "day" && to?.type === "day" && from.dayIdx === to.dayIdx) {
       const day = days[from.dayIdx];
       const oldIdx = day.stops.findIndex((s) => s.spotId === from.spotId);
       const newIdx = day.stops.findIndex((s) => s.spotId === to.spotId);
@@ -122,48 +223,45 @@ export default function DayPlannerBoard({
       return;
     }
 
-    // ===== 日 → 別の日に移動 =====
-    if (from.type === "day" && to.type === "day" && from.dayIdx !== to.dayIdx) {
+    // === プール → 日 ===
+    if (from.type === "pool" && toC.type === "day") {
+      const spot = availableSpots.find((s) => s.id === from.spotId);
+      if (!spot) return;
+      const newStop: RouteStop = { spotId: spot.id, spot, order: 0, startTime: "", duration: DEFAULT_DWELL };
+      const overIdx = to?.type === "day" ? days[toC.dayIdx].stops.findIndex((s) => s.spotId === to.spotId) : -1;
+      const insertIdx = overIdx >= 0 ? overIdx + 1 : days[toC.dayIdx].stops.length;
+      onDaysChange(days.map((d, i) => {
+        if (i !== toC.dayIdx) return d;
+        const ns = [...d.stops]; ns.splice(insertIdx, 0, newStop);
+        return { ...d, stops: ns.map((s, j) => ({ ...s, order: j })) };
+      }));
+      return;
+    }
+
+    // === 日 → 別の日 ===
+    if (from.type === "day" && toC.type === "day" && from.dayIdx !== toC.dayIdx) {
       const stop = days[from.dayIdx].stops.find((s) => s.spotId === from.spotId);
       if (!stop) return;
-      const overIdx = days[to.dayIdx].stops.findIndex((s) => s.spotId === to.spotId);
-      const insertIdx = overIdx >= 0 ? overIdx : days[to.dayIdx].stops.length;
+      const overIdx = to?.type === "day" ? days[toC.dayIdx].stops.findIndex((s) => s.spotId === to.spotId) : -1;
+      const insertIdx = overIdx >= 0 ? overIdx : days[toC.dayIdx].stops.length;
       onDaysChange(days.map((d, i) => {
         if (i === from.dayIdx) return { ...d, stops: d.stops.filter((s) => s.spotId !== from.spotId).map((s, j) => ({ ...s, order: j })) };
-        if (i === to.dayIdx) {
-          const newStops = [...d.stops];
-          newStops.splice(insertIdx, 0, stop);
-          return { ...d, stops: newStops.map((s, j) => ({ ...s, order: j })) };
+        if (i === toC.dayIdx) {
+          const ns = [...d.stops]; ns.splice(insertIdx, 0, stop);
+          return { ...d, stops: ns.map((s, j) => ({ ...s, order: j })) };
         }
         return d;
       }));
       return;
     }
 
-    // ===== プール → 日に追加 =====
-    if (from.type === "pool" && to.type === "day") {
-      const spot = availableSpots.find((s) => s.id === from.spotId);
-      if (!spot) return;
-      const newStop: RouteStop = { spotId: spot.id, spot, order: 0, startTime: "", duration: DEFAULT_DWELL };
-      const overIdx = days[to.dayIdx].stops.findIndex((s) => s.spotId === to.spotId);
-      const insertIdx = overIdx >= 0 ? overIdx + 1 : days[to.dayIdx].stops.length;
-      onDaysChange(days.map((d, i) => {
-        if (i !== to.dayIdx) return d;
-        const newStops = [...d.stops];
-        newStops.splice(insertIdx, 0, newStop);
-        return { ...d, stops: newStops.map((s, j) => ({ ...s, order: j })) };
-      }));
-      return;
-    }
-
-    // ===== 日 → プールに戻す =====
-    if (from.type === "day" && to.type === "pool") {
+    // === 日 → プール ===
+    if (from.type === "day" && toC.type === "pool") {
       onDaysChange(days.map((d, i) =>
         i === from.dayIdx ? { ...d, stops: d.stops.filter((s) => s.spotId !== from.spotId).map((s, j) => ({ ...s, order: j })) } : d
       ));
-      return;
     }
-  }, [days, availableSpots, onDaysChange]);
+  }, [days, availableSpots, onDaysChange, getContainer]);
 
   const handleRemove = useCallback((dayIndex: number, spotId: string) => {
     onDaysChange(days.map((d, i) =>
@@ -172,10 +270,8 @@ export default function DayPlannerBoard({
   }, [days, onDaysChange]);
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter}
+    <DndContext sensors={sensors} collisionDetection={customCollision}
       onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-
-      {/* 全アイテムを1つのSortableContextで管理 */}
       <SortableContext items={allIds} strategy={verticalListSortingStrategy}>
 
         {/* ヘッダー */}
@@ -199,18 +295,14 @@ export default function DayPlannerBoard({
                 未配置 <span className="text-gray-400 font-normal">{unusedSpots.length}</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto max-h-[700px] divide-y divide-gray-100">
+            <DropZone id="zone-pool" className="flex-1 overflow-y-auto max-h-[500px] divide-y divide-gray-100">
               {unusedSpots.length === 0 && <div className="p-3 text-[10px] text-gray-300 text-center">全て配置済み</div>}
               {unusedSpots.slice(0, 50).map((spot) => (
                 <SortableItem key={makePoolItemId(spot.id)} id={makePoolItemId(spot.id)}>
-                  <div className="flex items-center gap-2 px-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-gray-100">
-                    <span className="text-xs">{SPOT_ICONS[spot.type]}</span>
-                    <span className="text-xs text-gray-700 truncate flex-1">{spot.name}</span>
-                    <span className="text-[9px] text-gray-400 flex-shrink-0">{spot.score}</span>
-                  </div>
+                  <PoolCard spot={spot} />
                 </SortableItem>
               ))}
-            </div>
+            </DropZone>
           </div>
 
           {/* 日別カラム */}
@@ -232,53 +324,15 @@ export default function DayPlannerBoard({
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-[60px] overflow-y-auto max-h-[700px] divide-y divide-gray-50">
+                <DropZone id={`zone-day-${dayIdx}`} className="flex-1 min-h-[60px] overflow-y-auto max-h-[500px] divide-y divide-gray-50">
                   {day.stops.length === 0 && <div className="p-4 text-center text-[10px] text-gray-300">ドロップして追加</div>}
-                  {day.stops.map((stop, i) => {
-                    const advice = spotAdvice?.[stop.spotId];
-                    return (
+                  {day.stops.map((stop, i) => (
                     <SortableItem key={makeDayItemId(dayIdx, stop.spotId)} id={makeDayItemId(dayIdx, stop.spotId)}>
-                      <div className="px-2 py-1.5 bg-white cursor-grab active:cursor-grabbing">
-                        <div className="flex items-start gap-2">
-                          <div className="flex flex-col items-center flex-shrink-0">
-                            <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{i + 1}</div>
-                            {i < day.stops.length - 1 && <div className="w-px h-4 bg-gray-200 mt-0.5" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
-                              <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
-                            </div>
-                            {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
-                          </div>
-                          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemove(dayIdx, stop.spotId); }}
-                            className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
-                            onPointerDown={(e) => e.stopPropagation()}>
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                        {/* トーク提案 */}
-                        {!advice && adviceLoading && (
-                          <div className="ml-7 mt-1 text-[9px] text-gray-400 animate-pulse">💡 アドバイス生成中...</div>
-                        )}
-                        {advice && (
-                          <div className="ml-7 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                            <div className="text-[9px] text-amber-700 font-medium mb-0.5">💡 訴求ポイント</div>
-                            {advice.talkPoints.map((point, j) => (
-                              <div key={j} className="text-[9px] text-amber-800">・{point}</div>
-                            ))}
-                            {advice.avoidTopics.length > 0 && (
-                              <div className="text-[9px] text-red-500 mt-0.5">⚠ {advice.avoidTopics.join("、")}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <StopCard stop={stop} index={i} optimized={optimized}
+                        onRemove={() => handleRemove(dayIdx, stop.spotId)} />
                     </SortableItem>
-                    );
-                  })}
-                </div>
+                  ))}
+                </DropZone>
 
                 {day.stops.length >= 2 && (
                   <div className="p-2 border-t border-gray-100 space-y-1">
@@ -307,12 +361,66 @@ export default function DayPlannerBoard({
 
       </SortableContext>
 
-      <DragOverlay>
-        {activeItem && (
-          <div className="flex items-center gap-2 bg-white border-2 border-[#1B2A4A] shadow-lg rounded-lg px-3 py-2">
-            <span className="text-sm">{activeItem.icon}</span>
-            <span className="text-sm font-medium text-gray-800">{activeItem.label}</span>
+      {/* 訴求ポイント生成ボタン */}
+      {days.length > 0 && hasAnalysis && (!spotAdvice || Object.keys(spotAdvice).length === 0) && !adviceLoading && (
+        <div className="mt-4">
+          <button onClick={onGenerateAdvice} disabled={adviceLoading}
+            className="w-full py-3 text-sm font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-colors disabled:opacity-50 shadow-sm">
+            💡 訴求ポイントを作成する
+          </button>
+        </div>
+      )}
+
+      {/* アクティブな日の訴求ポイント */}
+      {days[activeDay] && days[activeDay].stops.length > 0 && (spotAdvice && Object.keys(spotAdvice).length > 0 || adviceLoading) && (
+        <div className="mt-4 bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-1.5 py-0.5 bg-[#1B2A4A] text-white text-[9px] font-bold rounded">
+              {days[activeDay].dayNumber}日目
+            </span>
+            <span className="text-sm font-semibold text-gray-800">訴求ポイント</span>
+            {adviceLoading && <span className="text-[10px] text-gray-400 animate-pulse">生成中...</span>}
           </div>
+          <div className="space-y-3">
+            {days[activeDay].stops.map((stop, i) => {
+              const advice = spotAdvice?.[stop.spotId];
+              return (
+                <div key={stop.spotId} className="flex gap-3">
+                  <div className="flex-shrink-0 flex items-start gap-2 w-[140px]">
+                    <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">{i + 1}</div>
+                    <div className="min-w-0">
+                      <div className="text-xs text-gray-800 truncate">{SPOT_ICONS[stop.spot.type]} {stop.spot.name}</div>
+                      {stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime}</div>}
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    {!advice && adviceLoading && <div className="text-[10px] text-gray-300 animate-pulse">生成中...</div>}
+                    {advice && (
+                      <div>
+                        {advice.talkPoints.map((point, j) => (
+                          <div key={j} className="text-xs text-amber-800 bg-amber-50 rounded px-2 py-1 mb-1">💡 {point}</div>
+                        ))}
+                        {advice.avoidTopics.length > 0 && (
+                          <div className="text-xs text-red-500 bg-red-50 rounded px-2 py-1">⚠ {advice.avoidTopics.join("、")}</div>
+                        )}
+                      </div>
+                    )}
+                    {!advice && !adviceLoading && <div className="text-[10px] text-gray-300">—</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ドラッグオーバーレイ（実際のカードを表示） */}
+      <DragOverlay dropAnimation={null}>
+        {dragItem?.type === "stop" && (
+          <StopCard stop={dragItem.stop} index={dragItem.index} optimized={optimized} isOverlay />
+        )}
+        {dragItem?.type === "pool" && (
+          <PoolCard spot={dragItem.spot} isOverlay />
         )}
       </DragOverlay>
     </DndContext>

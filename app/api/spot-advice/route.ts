@@ -15,7 +15,7 @@ interface SpotAdvice {
   avoidTopics: string[];
 }
 
-const MAX_SPOTS = 24; // 最大3日分（8箇所×3日）
+const MAX_SPOTS = 50; // ボタン制なので全日程分対応
 
 export async function POST(req: NextRequest) {
   const { policy, analysisRecommendations, analysisRisks, stops } = (await req.json()) as SpotAdviceRequest;
