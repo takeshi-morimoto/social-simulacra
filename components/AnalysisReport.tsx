@@ -5,8 +5,39 @@ import type { ElectionAnalysisResponse, ElectionDemographicProfile, AgeGroupResu
 interface Props {
   analysis: ElectionAnalysisResponse | null;
   demographics?: ElectionDemographicProfile | null;
+  municipality?: string;
   isLoading: boolean;
   visible: boolean;
+}
+
+/**
+ * 選挙種別を推定し、当選率を算出
+ * 支持率→当選率はシグモイド関数で変換（当選ラインを中心に急勾配）
+ */
+function estimateWinRate(approvalRate: number, municipality?: string): number {
+  // 選挙種別ごとの当選ライン（この支持率で当選確率50%）
+  let threshold = 35; // デフォルト: 衆議院小選挙区
+
+  if (municipality) {
+    if (/議会/.test(municipality)) {
+      // 市区町村議会: 定数が多いので低い支持率でも当選
+      threshold = 8;
+    } else if (/知事選/.test(municipality)) {
+      // 知事選: 事実上2択が多い
+      threshold = 40;
+    } else if (/長選/.test(municipality)) {
+      // 市区町村長選: 2-3人の争い
+      threshold = 35;
+    } else if (/選挙区/.test(municipality) && !(/第\d+区/.test(municipality))) {
+      // 参議院選挙区
+      threshold = 30;
+    }
+  }
+
+  // シグモイド関数: threshold付近で急勾配、両端で飽和
+  const k = 0.15; // 勾配の急さ
+  const raw = 1 / (1 + Math.exp(-k * (approvalRate - threshold)));
+  return Math.round(Math.min(Math.max(raw * 100, 1), 99)); // 1-99%に制限
 }
 
 /**
@@ -79,11 +110,12 @@ function AgeGroupRow({ group }: { group: AgeGroupResult }) {
   );
 }
 
-export default function AnalysisReport({ analysis, demographics, isLoading, visible }: Props) {
+export default function AnalysisReport({ analysis, demographics, municipality, isLoading, visible }: Props) {
   if (!visible) return null;
 
   const approvalRate = analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0;
   const votes = analysis ? estimateVotes(demographics, approvalRate) : null;
+  const winRate = analysis ? estimateWinRate(approvalRate, municipality) : null;
 
   return (
     <div className="animate-fade-in rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">
@@ -95,9 +127,19 @@ export default function AnalysisReport({ analysis, demographics, isLoading, visi
 
       {!isLoading && analysis && (
         <div className="grid gap-5">
-          {/* 支持率 + 推定得票数 */}
+          {/* 当選率 + 支持率 + 推定得票数 */}
           <div>
-            <div className="flex items-end gap-6 mb-3">
+            <div className="flex items-end gap-6 mb-3 flex-wrap">
+              {winRate !== null && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">推定当選率</div>
+                  <div className={`text-3xl font-black ${
+                    winRate >= 60 ? "text-green-600" : winRate >= 40 ? "text-amber-600" : "text-red-600"
+                  }`}>
+                    {winRate}<span className="text-lg">%</span>
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="text-xs text-gray-500 mb-1">推定支持率</div>
                 <div className="text-2xl font-black text-[#1B2A4A]">{approvalRate}%</div>
@@ -110,15 +152,20 @@ export default function AnalysisReport({ analysis, demographics, isLoading, visi
                   </div>
                 </div>
               )}
-              {analysis.raw_approval_rate != null && analysis.raw_approval_rate !== approvalRate && (
-                <div className="text-xs text-gray-400 self-end pb-1">生の支持率 {analysis.raw_approval_rate}%</div>
-              )}
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
               <div
-                className="h-full rounded-full bg-[#1B2A4A] transition-[width] duration-1000"
-                style={{ width: `${approvalRate}%` }}
+                className={`h-full rounded-full transition-[width] duration-1000 ${
+                  winRate && winRate >= 60 ? "bg-green-500" : winRate && winRate >= 40 ? "bg-amber-500" : "bg-red-500"
+                }`}
+                style={{ width: `${winRate ?? approvalRate}%` }}
               />
+            </div>
+            <div className="mt-1 text-[10px] text-gray-400">
+              {winRate !== null && winRate >= 60 ? "当選圏内 — この勢いを維持しましょう" :
+               winRate !== null && winRate >= 40 ? "接戦 — 戦略的な遊説が鍵です" :
+               winRate !== null && winRate >= 20 ? "厳しい戦い — 政策の見直しを検討してください" :
+               "苦戦 — 抜本的な戦略転換が必要です"}
             </div>
           </div>
 

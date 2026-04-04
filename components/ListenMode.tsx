@@ -92,7 +92,7 @@ export default function ListenMode({
         <LoadingOverlay message="選挙戦略レポートを生成中..." estimateSeconds={8} />
       )}
 
-      <AnalysisReport analysis={analysis} demographics={demographics} isLoading={false} visible={showAnalysis && !analysisLoading} />
+      <AnalysisReport analysis={analysis} demographics={demographics} municipality={municipality} isLoading={false} visible={showAnalysis && !analysisLoading} />
 
       <div ref={shareCardRef}>
         <ShareCard

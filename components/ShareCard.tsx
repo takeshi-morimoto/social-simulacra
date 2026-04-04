@@ -28,10 +28,10 @@ const CON_STANCES = new Set(["反対", "強く反対"]);
 type LetterGrade = { letter: string; bg: string; border: string };
 
 function getLetterGrade(rate: number): LetterGrade {
-  if (rate >= 90) return { letter: "S", bg: "from-amber-400 to-yellow-500", border: "border-amber-400" };
-  if (rate >= 75) return { letter: "A", bg: "from-emerald-400 to-green-500", border: "border-emerald-400" };
-  if (rate >= 60) return { letter: "B", bg: "from-blue-400 to-sky-500", border: "border-blue-400" };
-  if (rate >= 40) return { letter: "C", bg: "from-orange-400 to-amber-500", border: "border-orange-400" };
+  if (rate >= 80) return { letter: "S", bg: "from-amber-400 to-yellow-500", border: "border-amber-400" };
+  if (rate >= 65) return { letter: "A", bg: "from-emerald-400 to-green-500", border: "border-emerald-400" };
+  if (rate >= 50) return { letter: "B", bg: "from-blue-400 to-sky-500", border: "border-blue-400" };
+  if (rate >= 35) return { letter: "C", bg: "from-orange-400 to-amber-500", border: "border-orange-400" };
   if (rate >= 20) return { letter: "D", bg: "from-red-400 to-rose-500", border: "border-red-400" };
   return { letter: "F", bg: "from-red-600 to-red-800", border: "border-red-600" };
 }
@@ -129,6 +129,10 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
     : 0.55;
   const estimatedVotes = voterPop > 0 ? Math.round(voterPop * avgTurnout * displayRate / 100) : null;
 
+  // 当選率（シグモイド）
+  const threshold = municipality?.includes("議会") ? 8 : municipality?.includes("知事") ? 40 : 35;
+  const winRate = Math.round(Math.min(Math.max(1 / (1 + Math.exp(-0.15 * (displayRate - threshold))) * 100, 1), 99));
+
   return (
     <div className="mb-6" style={{ aspectRatio: "1200 / 630" }}>
       <div className="h-full rounded-xl border-2 border-gray-900 bg-gradient-to-br from-slate-50 via-white to-gray-100 shadow-lg relative overflow-hidden flex flex-col">
@@ -149,7 +153,7 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
 
         {/* Middle */}
         {stanceCounts && total > 0 && analysis && (() => {
-          const grade = getLetterGrade(displayRate);
+          const grade = getLetterGrade(winRate);
           return (
             <div className="flex-1 flex flex-col justify-center px-6 relative">
               <div className="flex items-center gap-4 mb-3">
@@ -157,15 +161,16 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
                   <span className="text-4xl font-black text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>{grade.letter}</span>
                 </div>
                 <div>
-                  <span className="text-5xl font-black text-gray-900 leading-none">{displayRate}%</span>
-                  <span className="text-xs text-gray-400 font-medium ml-1">支持率</span>
+                  <span className={`text-5xl font-black leading-none ${winRate >= 60 ? "text-green-600" : winRate >= 40 ? "text-amber-600" : "text-red-600"}`}>{winRate}%</span>
+                  <span className="text-xs text-gray-400 font-medium ml-1">当選率</span>
                 </div>
-                {estimatedVotes !== null && (
-                  <div className="border-l border-gray-300 pl-4">
-                    <span className="text-3xl font-black text-gray-900 leading-none">{estimatedVotes.toLocaleString()}</span>
-                    <span className="text-xs text-gray-400 font-medium ml-1">票</span>
-                  </div>
-                )}
+                <div className="border-l border-gray-300 pl-4">
+                  <span className="text-2xl font-black text-gray-700 leading-none">{displayRate}%</span>
+                  <span className="text-[10px] text-gray-400 ml-1">支持率</span>
+                  {estimatedVotes !== null && (
+                    <span className="text-[10px] text-gray-400 ml-2">{estimatedVotes.toLocaleString()}票</span>
+                  )}
+                </div>
               </div>
 
               {analysis.share_comment && (
