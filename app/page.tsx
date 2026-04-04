@@ -500,6 +500,7 @@ export default function Home() {
                 analysisLoading={analysisLoading}
                 showAnalysis={showAnalysis}
                 candidateProfile={candidateProfile}
+                demographics={demographics}
                 ageFilter={ageFilter}
                 onAgeFilterChange={setAgeFilter}
               />

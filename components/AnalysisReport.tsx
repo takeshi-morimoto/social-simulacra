@@ -1,11 +1,38 @@
 "use client";
 
-import type { ElectionAnalysisResponse, AgeGroupResult } from "@/lib/types";
+import type { ElectionAnalysisResponse, ElectionDemographicProfile, AgeGroupResult } from "@/lib/types";
 
 interface Props {
   analysis: ElectionAnalysisResponse | null;
+  demographics?: ElectionDemographicProfile | null;
   isLoading: boolean;
   visible: boolean;
+}
+
+/**
+ * 「約250,000人」のような文字列から数値を抽出
+ */
+function parseVoterPopulation(s: string): number {
+  const cleaned = s.replace(/[約人,\s]/g, "");
+  const num = parseInt(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
+ * 推定得票数を計算
+ */
+function estimateVotes(demographics: ElectionDemographicProfile | null | undefined, approvalRate: number): number | null {
+  if (!demographics?.voter_population || !demographics?.voter_turnout_rates) return null;
+  const voterPop = parseVoterPopulation(demographics.voter_population);
+  if (voterPop === 0) return null;
+
+  // 全体の平均投票率を算出
+  const rates = demographics.voter_turnout_rates;
+  const avgTurnout = rates.length > 0
+    ? rates.reduce((sum, r) => sum + r.overall, 0) / rates.length / 100
+    : 0.55;
+
+  return Math.round(voterPop * avgTurnout * (approvalRate / 100));
 }
 
 const STANCE_COLORS: Record<string, string> = {
@@ -52,8 +79,11 @@ function AgeGroupRow({ group }: { group: AgeGroupResult }) {
   );
 }
 
-export default function AnalysisReport({ analysis, isLoading, visible }: Props) {
+export default function AnalysisReport({ analysis, demographics, isLoading, visible }: Props) {
   if (!visible) return null;
+
+  const approvalRate = analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0;
+  const votes = analysis ? estimateVotes(demographics, approvalRate) : null;
 
   return (
     <div className="animate-fade-in rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">
@@ -65,20 +95,30 @@ export default function AnalysisReport({ analysis, isLoading, visible }: Props) 
 
       {!isLoading && analysis && (
         <div className="grid gap-5">
-          {/* Dual Approval Rate */}
+          {/* 支持率 + 推定得票数 */}
           <div>
-            <div className="mb-1.5 text-xs text-gray-500">推定支持率（投票率加重）</div>
+            <div className="flex items-end gap-6 mb-3">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">推定支持率</div>
+                <div className="text-2xl font-black text-[#1B2A4A]">{approvalRate}%</div>
+              </div>
+              {votes !== null && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">推定得票数</div>
+                  <div className="text-2xl font-black text-[#1B2A4A]">
+                    {votes.toLocaleString()}<span className="text-sm font-medium text-gray-500 ml-1">票</span>
+                  </div>
+                </div>
+              )}
+              {analysis.raw_approval_rate != null && analysis.raw_approval_rate !== approvalRate && (
+                <div className="text-xs text-gray-400 self-end pb-1">生の支持率 {analysis.raw_approval_rate}%</div>
+              )}
+            </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-gray-100">
               <div
                 className="h-full rounded-full bg-[#1B2A4A] transition-[width] duration-1000"
-                style={{ width: `${analysis.weighted_approval_rate ?? analysis.approval_rate}%` }}
+                style={{ width: `${approvalRate}%` }}
               />
-            </div>
-            <div className="mt-1 flex items-center gap-3">
-              <span className="text-sm font-bold text-[#1B2A4A]">{analysis.weighted_approval_rate ?? analysis.approval_rate}%</span>
-              {analysis.raw_approval_rate != null && analysis.raw_approval_rate !== (analysis.weighted_approval_rate ?? analysis.approval_rate) && (
-                <span className="text-xs text-gray-400">（生の支持率 {analysis.raw_approval_rate}%）</span>
-              )}
             </div>
           </div>
 

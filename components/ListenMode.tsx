@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useMemo } from "react";
-import type { VoterPersona, PersonaResponse, ElectionAnalysisResponse, StanceCounts, AgeGroupFilter, CandidateProfile } from "@/lib/types";
+import type { VoterPersona, PersonaResponse, ElectionAnalysisResponse, ElectionDemographicProfile, StanceCounts, AgeGroupFilter, CandidateProfile } from "@/lib/types";
 import PolicyInput from "@/components/PolicyInput";
 import AgeFilter from "@/components/AgeFilter";
 import PersonaCard from "@/components/PersonaCard";
@@ -25,6 +25,7 @@ interface Props {
   analysisLoading: boolean;
   showAnalysis: boolean;
   candidateProfile: CandidateProfile;
+  demographics?: ElectionDemographicProfile | null;
   ageFilter: AgeGroupFilter;
   onAgeFilterChange: (v: AgeGroupFilter) => void;
 }
@@ -36,6 +37,7 @@ export default function ListenMode({
   personas, personaResults, loadingPersonas,
   stanceCounts, showStanceBar,
   analysis, analysisLoading, showAnalysis,
+  demographics,
   ageFilter, onAgeFilterChange,
 }: Props) {
   const shareCardRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,7 @@ export default function ListenMode({
         <LoadingOverlay message="選挙戦略レポートを生成中..." estimateSeconds={8} />
       )}
 
-      <AnalysisReport analysis={analysis} isLoading={false} visible={showAnalysis && !analysisLoading} />
+      <AnalysisReport analysis={analysis} demographics={demographics} isLoading={false} visible={showAnalysis && !analysisLoading} />
 
       <div ref={shareCardRef}>
         <ShareCard
@@ -98,6 +100,7 @@ export default function ListenMode({
           policy={policy}
           stanceCounts={filteredStanceCounts}
           analysis={analysis}
+          demographics={demographics}
           personas={filteredPersonas}
           personaResults={personaResults}
           visible={showAnalysis && !analysisLoading && !!analysis}

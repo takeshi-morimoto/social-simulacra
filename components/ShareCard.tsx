@@ -1,12 +1,13 @@
 "use client";
 
-import type { VoterPersona, PersonaResponse, StanceCounts, ElectionAnalysisResponse } from "@/lib/types";
+import type { VoterPersona, PersonaResponse, StanceCounts, ElectionAnalysisResponse, ElectionDemographicProfile } from "@/lib/types";
 
 interface Props {
   municipality: string;
   policy?: string;
   stanceCounts?: StanceCounts;
   analysis?: ElectionAnalysisResponse | null;
+  demographics?: ElectionDemographicProfile | null;
   personas?: VoterPersona[];
   personaResults?: Record<number, PersonaResponse | null>;
   visible: boolean;
@@ -107,7 +108,12 @@ function BgIllustrations() {
   );
 }
 
-export default function ShareCard({ municipality, policy, stanceCounts, analysis, personas, personaResults, visible }: Props) {
+function parseVoterPop(s: string): number {
+  const num = parseInt(s.replace(/[約人,\s]/g, ""));
+  return isNaN(num) ? 0 : num;
+}
+
+export default function ShareCard({ municipality, policy, stanceCounts, analysis, demographics, personas, personaResults, visible }: Props) {
   if (!visible) return null;
 
   const total = stanceCounts ? Object.values(stanceCounts).reduce((a, b) => a + b, 0) : 0;
@@ -115,6 +121,13 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
   const conOpinion = personas && personaResults ? getRepresentativeOpinion(personas, personaResults, CON_STANCES) : null;
 
   const displayRate = analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0;
+
+  // 推定得票数
+  const voterPop = demographics ? parseVoterPop(demographics.voter_population) : 0;
+  const avgTurnout = demographics?.voter_turnout_rates?.length
+    ? demographics.voter_turnout_rates.reduce((s, r) => s + r.overall, 0) / demographics.voter_turnout_rates.length / 100
+    : 0.55;
+  const estimatedVotes = voterPop > 0 ? Math.round(voterPop * avgTurnout * displayRate / 100) : null;
 
   return (
     <div className="mb-6" style={{ aspectRatio: "1200 / 630" }}>
@@ -143,8 +156,16 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
                 <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${grade.bg} border-2 ${grade.border} flex items-center justify-center shadow-md shrink-0`}>
                   <span className="text-4xl font-black text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>{grade.letter}</span>
                 </div>
-                <span className="text-5xl font-black text-gray-900 leading-none">{displayRate}%</span>
-                <span className="text-xs text-gray-400 font-medium">加重支持率</span>
+                <div>
+                  <span className="text-5xl font-black text-gray-900 leading-none">{displayRate}%</span>
+                  <span className="text-xs text-gray-400 font-medium ml-1">支持率</span>
+                </div>
+                {estimatedVotes !== null && (
+                  <div className="border-l border-gray-300 pl-4">
+                    <span className="text-3xl font-black text-gray-900 leading-none">{estimatedVotes.toLocaleString()}</span>
+                    <span className="text-xs text-gray-400 font-medium ml-1">票</span>
+                  </div>
+                )}
               </div>
 
               {analysis.share_comment && (
