@@ -199,7 +199,7 @@ export default function DayPlannerBoard({
                 未配置 <span className="text-gray-400 font-normal">{unusedSpots.length}</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto max-h-[400px] divide-y divide-gray-100">
+            <div className="flex-1 overflow-y-auto max-h-[700px] divide-y divide-gray-100">
               {unusedSpots.length === 0 && <div className="p-3 text-[10px] text-gray-300 text-center">全て配置済み</div>}
               {unusedSpots.slice(0, 50).map((spot) => (
                 <SortableItem key={makePoolItemId(spot.id)} id={makePoolItemId(spot.id)}>
@@ -232,7 +232,7 @@ export default function DayPlannerBoard({
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-[60px] overflow-y-auto max-h-[400px] divide-y divide-gray-50">
+                <div className="flex-1 min-h-[60px] overflow-y-auto max-h-[700px] divide-y divide-gray-50">
                   {day.stops.length === 0 && <div className="p-4 text-center text-[10px] text-gray-300">ドロップして追加</div>}
                   {day.stops.map((stop, i) => {
                     const advice = spotAdvice?.[stop.spotId];

@@ -15,7 +15,7 @@ interface SpotAdvice {
   avoidTopics: string[];
 }
 
-const MAX_SPOTS = 8; // API負荷とトークン制限を考慮
+const MAX_SPOTS = 24; // 最大3日分（8箇所×3日）
 
 export async function POST(req: NextRequest) {
   const { policy, analysisRecommendations, analysisRisks, stops } = (await req.json()) as SpotAdviceRequest;
@@ -48,7 +48,7 @@ JSON配列で回答。talkPointsは各2個、avoidTopicsは1個、各15字以内
     const result = await callAnthropic<SpotAdvice[]>(
       systemPrompt,
       `${limitedStops.length}箇所`,
-      4096,
+      8192,
       true,
     );
 

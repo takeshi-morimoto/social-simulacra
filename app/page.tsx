@@ -307,10 +307,12 @@ export default function Home() {
   // --- スポット取得（キャッシュ対応） ---
   const fetchSpots = useCallback(async () => {
     const target = municipality.trim();
+    console.log("[fetchSpots] target:", target);
     if (!target) return;
 
     // キャッシュ確認
     const cached = cacheGet<CampaignSpot[]>("spots", target);
+    console.log("[fetchSpots] cache:", cached ? `${cached.length} spots` : "miss");
     if (cached && cached.length > 0) {
       setRawSpots(cached);
       setSpotsError("");
@@ -336,6 +338,7 @@ export default function Home() {
     try {
       const res = await fetch(`/api/plateau-spots?municipality=${encodeURIComponent(target)}`);
       const data = await res.json();
+      console.log("[fetchSpots] API response:", data.spots?.length ?? 0, "spots, error:", data.error, "message:", data.message);
       if (data.spots && data.spots.length > 0) {
         setRawSpots(data.spots);
         cacheSet("spots", target, data.spots, 7);
@@ -345,17 +348,29 @@ export default function Home() {
     } catch {
       setSpotsError("スポットの取得に失敗しました");
     } finally {
-      setSpotsMunicipality(target);
       setSpotsLoading(false);
     }
+    // 成功・失敗に関わらず記録（失敗時はrawSpotsが空のまま）
+    setSpotsMunicipality(target);
   }, [municipality]);
 
-  // 遊説プランセクションが開かれた時にスポット自動取得
-  useEffect(() => {
-    if (openSections.route && municipality.trim() && spotsMunicipality !== municipality.trim() && !spotsLoading && rawSpots.length === 0) {
+  // セクション開閉をオーバーライド: 遊説プランを開くときにスポット取得
+  const originalToggleSection = toggleSection;
+  const handleToggleSection = useCallback((key: "analysis" | "policy" | "route") => {
+    originalToggleSection(key);
+    if (key === "route" && !openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading) {
       fetchSpots();
     }
-  }, [openSections.route, municipality, spotsMunicipality, spotsLoading, rawSpots.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [originalToggleSection, openSections.route, municipality, rawSpots.length, spotsLoading, fetchSpots]);
+
+  // 遊説プランセクションが開いているのにスポットがない場合に取得
+  useEffect(() => {
+    console.log("[spots-effect] route:", openSections.route, "muni:", municipality, "spots:", rawSpots.length, "loading:", spotsLoading, "error:", spotsError);
+    if (openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading && !spotsError) {
+      console.log("[spots-effect] calling fetchSpots");
+      fetchSpots();
+    }
+  }, [openSections.route, municipality, rawSpots.length, spotsLoading, spotsError, fetchSpots]);
 
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
@@ -427,7 +442,7 @@ export default function Home() {
         policy,
         analysisRecommendations: analysis.recommendations,
         analysisRisks: analysis.risks,
-        stops: allStops.slice(0, 8),
+        stops: allStops.slice(0, 24),
       }),
     })
       .then((res) => {
@@ -521,7 +536,7 @@ export default function Home() {
         </div>
 
         {/* ===== ① 地域分析 ===== */}
-        <Section title="地域分析" step={1} done={hasPersonas} open={openSections.analysis} onToggle={() => toggleSection("analysis")}>
+        <Section title="地域分析" step={1} done={hasPersonas} open={openSections.analysis} onToggle={() => handleToggleSection("analysis")}>
           <MunicipalityInput
             value={municipality}
             onChange={setMunicipality}
@@ -549,7 +564,7 @@ export default function Home() {
         {/* ===== ② 政策テスト ===== */}
         <div ref={policySectionRef}>
           <Section title="政策テスト" step={2} done={hasAnalysis}
-            open={openSections.policy} onToggle={() => toggleSection("policy")}>
+            open={openSections.policy} onToggle={() => handleToggleSection("policy")}>
             {!hasPersonas ? (
               <div className="text-center py-8 text-gray-400 text-sm">
                 先に地域分析でペルソナを生成してください
@@ -581,7 +596,7 @@ export default function Home() {
         {/* ===== ③ 遊説プラン ===== */}
         <div ref={routeSectionRef}>
           <Section title="遊説プラン" step={3} done={hasRoute}
-            open={openSections.route} onToggle={() => toggleSection("route")}>
+            open={openSections.route} onToggle={() => handleToggleSection("route")}>
 
             {spotsLoading && (
               <LoadingOverlay message="遊説スポットを取得中..." estimateSeconds={5} />
