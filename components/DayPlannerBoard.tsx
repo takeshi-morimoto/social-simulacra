@@ -172,10 +172,16 @@ export default function DayPlannerBoard({
             全{days.length}日間の遊説プラン
             <span className="text-xs text-gray-400 font-normal ml-2">合計{days.reduce((sum, d) => sum + d.stops.length, 0)}箇所</span>
           </div>
-          <button onClick={onSave} disabled={saving}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#1B2A4A] text-white hover:bg-[#2a3d5c] transition-colors disabled:opacity-50">
-            {saving ? "保存中..." : "全日程を保存"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.print()}
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-[#1B2A4A] text-[#1B2A4A] hover:bg-[#1B2A4A] hover:text-white transition-colors print:hidden">
+              印刷する
+            </button>
+            <button onClick={onSave} disabled={saving}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-[#1B2A4A] text-white hover:bg-[#2a3d5c] transition-colors disabled:opacity-50">
+              {saving ? "保存中..." : "全日程を保存"}
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory sm:snap-none">
@@ -330,6 +336,14 @@ export default function DayPlannerBoard({
           ))}
         </div>
       )}
+
+      {/* 印刷用ビュー */}
+      <PrintRoute
+        days={days}
+        spotAdvice={spotAdvice || {}}
+        municipality={municipality || ""}
+        optimized={optimized}
+      />
 
       <DragOverlay>
         {activeItem && (
