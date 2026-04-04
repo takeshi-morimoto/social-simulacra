@@ -79,7 +79,10 @@ export default function Home() {
   });
 
   // --- 政策テスト ---
-  const [policy, setPolicy] = useState("");
+  const [policy, setPolicy] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("sanbo_policy") || "";
+  });
   const [isRunning, setIsRunning] = useState(false);
   const [personaResults, setPersonaResults] = useState<Record<number, PersonaResponse | null>>({});
   const [loadingPersonas, setLoadingPersonas] = useState<Set<number>>(new Set());
@@ -301,6 +304,11 @@ export default function Home() {
     setAnalysisLoading(false);
     setIsRunning(false);
   }, [policy, personas, candidateProfile, customData, municipality, restoreSimulation]);
+
+  // 政策テキストをlocalStorageに保存
+  useEffect(() => {
+    if (policy) localStorage.setItem("sanbo_policy", policy);
+  }, [policy]);
 
   // （シミュレーション結果は上のcacheSetで保存済み）
 
