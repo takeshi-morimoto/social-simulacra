@@ -43,6 +43,14 @@
   margin-top: -2px;
 }
 
+/* 印刷用スタイル */
+@media print {
+  body > *:not(#print-route-root) { display: none !important; }
+  #print-route-root { display: block !important; }
+  .print-page { page-break-after: always; }
+  .print-page:last-child { page-break-after: auto; }
+}
+
 /* Leaflet tooltip override for route numbers (remove default styling) */
 .route-number-tooltip {
   background: transparent !important;
