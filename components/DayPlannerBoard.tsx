@@ -4,16 +4,12 @@ import { useState, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
   pointerWithin,
-  rectIntersection,
   PointerSensor,
   useSensor,
   useSensors,
-  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
-  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -41,70 +37,17 @@ function parseId(id: string): { type: "day"; dayIdx: number; spotId: string } | 
   return null;
 }
 
-// --- ソート可能アイテム ---
 function SortableItem({ id, children }: { id: string; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`touch-none ${isDragging ? "opacity-20 bg-blue-50 border border-dashed border-blue-300 rounded" : ""}`}>
-      {isDragging ? <div className="h-8" /> : children}
-    </div>
-  );
-}
-
-// --- ドロップゾーン ---
-function DropZone({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div ref={setNodeRef} className={`${className || ""} ${isOver ? "ring-2 ring-blue-300 ring-inset bg-blue-50/30" : ""} transition-all`}>
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
+      className="touch-none">
       {children}
     </div>
   );
 }
 
-// --- カードの中身（通常表示＆オーバーレイ共用） ---
-function StopCard({ stop, index, optimized, onRemove, isOverlay }: {
-  stop: RouteStop; index: number; optimized: boolean; onRemove?: () => void; isOverlay?: boolean;
-}) {
-  return (
-    <div className={`flex items-start gap-1.5 px-2 py-1.5 bg-white ${isOverlay ? "shadow-xl border-2 border-[#1B2A4A] rounded-lg scale-105" : "cursor-grab active:cursor-grabbing hover:bg-gray-50"} transition-colors`}>
-      <span className="text-[10px] text-gray-300 mt-1 select-none">⠿</span>
-      <div className="flex flex-col items-center flex-shrink-0">
-        <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{index + 1}</div>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
-          <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
-        </div>
-        {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
-      </div>
-      {onRemove && !isOverlay && (
-        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(); }}
-          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
-          onPointerDown={(e) => e.stopPropagation()}>
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-}
-
-function PoolCard({ spot, isOverlay }: { spot: CampaignSpot; isOverlay?: boolean }) {
-  return (
-    <div className={`flex items-center gap-1.5 px-2 py-1.5 ${isOverlay ? "bg-white shadow-xl border-2 border-[#1B2A4A] rounded-lg scale-105" : "cursor-grab active:cursor-grabbing hover:bg-gray-100"}`}>
-      <span className="text-[10px] text-gray-300 select-none">⠿</span>
-      <span className="text-xs">{SPOT_ICONS[spot.type]}</span>
-      <span className="text-xs text-gray-700 truncate flex-1">{spot.name}</span>
-      <span className="text-[9px] text-gray-400 flex-shrink-0">{spot.score}</span>
-    </div>
-  );
-}
-
-// --- 型定義 ---
 interface SpotAdviceData { talkPoints: string[]; avoidTopics: string[]; }
 
 interface Props {
@@ -123,97 +66,44 @@ interface Props {
   onSave: () => void;
 }
 
-type DragItem = { type: "stop"; stop: RouteStop; dayIdx: number; index: number }
-  | { type: "pool"; spot: CampaignSpot };
-
 export default function DayPlannerBoard({
   days, activeDay, optimized, availableSpots, saving,
   spotAdvice, adviceLoading, hasAnalysis, onGenerateAdvice,
   onDaysChange, onActiveDayChange, onOptimize, onSave,
 }: Props) {
-  const [dragItem, setDragItem] = useState<DragItem | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [activeItem, setActiveItem] = useState<{ label: string; icon: string } | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const usedIds = new Set(days.flatMap((d) => d.stops.map((s) => s.spotId)));
   const unusedSpots = availableSpots.filter((s) => !usedIds.has(s.id));
 
-  // 全アイテムを1つのSortableContextで管理（ドラッグ中の移動を可能に）
   const allIds: string[] = [
     ...unusedSpots.map((s) => makePoolItemId(s.id)),
     ...days.flatMap((day, dayIdx) => day.stops.map((s) => makeDayItemId(dayIdx, s.spotId))),
   ];
-
-  // カスタムコリジョン: まずどのカラム(DropZone)にポインタがあるか判定し、
-  // そのカラム内のアイテムだけでclosestCenterを実行
-  const customCollision: CollisionDetection = useCallback((args) => {
-    // DropZone（カラム）に対してpointerWithinで判定
-    const dropZoneIds = ["zone-pool", ...days.map((_, i) => `zone-day-${i}`)];
-    const zoneContainers = args.droppableContainers.filter((c) => dropZoneIds.includes(String(c.id)));
-    const zoneHits = pointerWithin({ ...args, droppableContainers: zoneContainers });
-
-    if (zoneHits.length > 0) {
-      const zoneId = String(zoneHits[0].id);
-      // そのゾーン内のアイテムだけでclosestCenter
-      let itemPrefix: string;
-      if (zoneId === "zone-pool") {
-        itemPrefix = "pool-";
-      } else {
-        const dayIdx = zoneId.replace("zone-day-", "");
-        itemPrefix = `d${dayIdx}-`;
-      }
-      const zoneItems = args.droppableContainers.filter((c) => String(c.id).startsWith(itemPrefix));
-      if (zoneItems.length > 0) {
-        const itemHits = closestCenter({ ...args, droppableContainers: zoneItems });
-        if (itemHits.length > 0) return itemHits;
-      }
-      // ゾーン内にアイテムがない場合、ゾーン自体を返す（空カラムへのドロップ）
-      return zoneHits;
-    }
-
-    // ゾーンにヒットしない場合はrectIntersectionでフォールバック
-    return rectIntersection(args);
-  }, [days]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
     const parsed = parseId(String(e.active.id));
     if (!parsed) return;
     if (parsed.type === "pool") {
       const spot = availableSpots.find((s) => s.id === parsed.spotId);
-      if (spot) setDragItem({ type: "pool", spot });
+      if (spot) setActiveItem({ label: spot.name, icon: SPOT_ICONS[spot.type] || "📍" });
     } else {
-      const day = days[parsed.dayIdx];
-      const idx = day?.stops.findIndex((s) => s.spotId === parsed.spotId) ?? -1;
-      const stop = day?.stops[idx];
-      if (stop) setDragItem({ type: "stop", stop, dayIdx: parsed.dayIdx, index: idx });
+      const stop = days[parsed.dayIdx]?.stops.find((s) => s.spotId === parsed.spotId);
+      if (stop) setActiveItem({ label: stop.spot.name, icon: SPOT_ICONS[stop.spot.type] || "📍" });
     }
   }, [days, availableSpots]);
 
-  // overIdからコンテナ（日のインデックスまたは"pool"）を特定
-  const getContainer = useCallback((id: string): { type: "pool" } | { type: "day"; dayIdx: number } | null => {
-    if (id === "zone-pool" || id.startsWith("pool-")) return { type: "pool" };
-    const zoneMatch = id.match(/^zone-day-(\d+)$/);
-    if (zoneMatch) return { type: "day", dayIdx: parseInt(zoneMatch[1]) };
-    const parsed = parseId(id);
-    if (parsed?.type === "day") return { type: "day", dayIdx: parsed.dayIdx };
-    if (parsed?.type === "pool") return { type: "pool" };
-    return null;
-  }, []);
-
   const handleDragEnd = useCallback((e: DragEndEvent) => {
-    setDragItem(null);
+    setActiveItem(null);
     const { active, over } = e;
     if (!over || active.id === over.id) return;
 
     const from = parseId(String(active.id));
-    if (!from) return;
-
-    const toC = getContainer(String(over.id));
-    if (!toC) return;
-
     const to = parseId(String(over.id));
+    if (!from || !to) return;
 
-    // === 同じ日の中で並べ替え ===
-    if (from.type === "day" && to?.type === "day" && from.dayIdx === to.dayIdx) {
+    if (from.type === "day" && to.type === "day" && from.dayIdx === to.dayIdx) {
       const day = days[from.dayIdx];
       const oldIdx = day.stops.findIndex((s) => s.spotId === from.spotId);
       const newIdx = day.stops.findIndex((s) => s.spotId === to.spotId);
@@ -223,30 +113,14 @@ export default function DayPlannerBoard({
       return;
     }
 
-    // === プール → 日 ===
-    if (from.type === "pool" && toC.type === "day") {
-      const spot = availableSpots.find((s) => s.id === from.spotId);
-      if (!spot) return;
-      const newStop: RouteStop = { spotId: spot.id, spot, order: 0, startTime: "", duration: DEFAULT_DWELL };
-      const overIdx = to?.type === "day" ? days[toC.dayIdx].stops.findIndex((s) => s.spotId === to.spotId) : -1;
-      const insertIdx = overIdx >= 0 ? overIdx + 1 : days[toC.dayIdx].stops.length;
-      onDaysChange(days.map((d, i) => {
-        if (i !== toC.dayIdx) return d;
-        const ns = [...d.stops]; ns.splice(insertIdx, 0, newStop);
-        return { ...d, stops: ns.map((s, j) => ({ ...s, order: j })) };
-      }));
-      return;
-    }
-
-    // === 日 → 別の日 ===
-    if (from.type === "day" && toC.type === "day" && from.dayIdx !== toC.dayIdx) {
+    if (from.type === "day" && to.type === "day" && from.dayIdx !== to.dayIdx) {
       const stop = days[from.dayIdx].stops.find((s) => s.spotId === from.spotId);
       if (!stop) return;
-      const overIdx = to?.type === "day" ? days[toC.dayIdx].stops.findIndex((s) => s.spotId === to.spotId) : -1;
-      const insertIdx = overIdx >= 0 ? overIdx : days[toC.dayIdx].stops.length;
+      const overIdx = days[to.dayIdx].stops.findIndex((s) => s.spotId === to.spotId);
+      const insertIdx = overIdx >= 0 ? overIdx : days[to.dayIdx].stops.length;
       onDaysChange(days.map((d, i) => {
         if (i === from.dayIdx) return { ...d, stops: d.stops.filter((s) => s.spotId !== from.spotId).map((s, j) => ({ ...s, order: j })) };
-        if (i === toC.dayIdx) {
+        if (i === to.dayIdx) {
           const ns = [...d.stops]; ns.splice(insertIdx, 0, stop);
           return { ...d, stops: ns.map((s, j) => ({ ...s, order: j })) };
         }
@@ -255,13 +129,26 @@ export default function DayPlannerBoard({
       return;
     }
 
-    // === 日 → プール ===
-    if (from.type === "day" && toC.type === "pool") {
+    if (from.type === "pool" && to.type === "day") {
+      const spot = availableSpots.find((s) => s.id === from.spotId);
+      if (!spot) return;
+      const newStop: RouteStop = { spotId: spot.id, spot, order: 0, startTime: "", duration: DEFAULT_DWELL };
+      const overIdx = days[to.dayIdx].stops.findIndex((s) => s.spotId === to.spotId);
+      const insertIdx = overIdx >= 0 ? overIdx + 1 : days[to.dayIdx].stops.length;
+      onDaysChange(days.map((d, i) => {
+        if (i !== to.dayIdx) return d;
+        const ns = [...d.stops]; ns.splice(insertIdx, 0, newStop);
+        return { ...d, stops: ns.map((s, j) => ({ ...s, order: j })) };
+      }));
+      return;
+    }
+
+    if (from.type === "day" && to.type === "pool") {
       onDaysChange(days.map((d, i) =>
         i === from.dayIdx ? { ...d, stops: d.stops.filter((s) => s.spotId !== from.spotId).map((s, j) => ({ ...s, order: j })) } : d
       ));
     }
-  }, [days, availableSpots, onDaysChange, getContainer]);
+  }, [days, availableSpots, onDaysChange]);
 
   const handleRemove = useCallback((dayIndex: number, spotId: string) => {
     onDaysChange(days.map((d, i) =>
@@ -270,11 +157,10 @@ export default function DayPlannerBoard({
   }, [days, onDaysChange]);
 
   return (
-    <DndContext sensors={sensors} collisionDetection={customCollision}
+    <DndContext sensors={sensors} collisionDetection={pointerWithin}
       onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <SortableContext items={allIds} strategy={verticalListSortingStrategy}>
 
-        {/* ヘッダー */}
         <div className="mb-3 flex items-center justify-between">
           <div className="text-sm font-semibold text-gray-800">
             全{days.length}日間の遊説プラン
@@ -286,7 +172,6 @@ export default function DayPlannerBoard({
           </button>
         </div>
 
-        {/* ボード */}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {/* 未配置スポット */}
           <div className="flex flex-col bg-gray-50 rounded-lg border border-dashed border-gray-300 flex-1 min-w-[160px]">
@@ -295,14 +180,18 @@ export default function DayPlannerBoard({
                 未配置 <span className="text-gray-400 font-normal">{unusedSpots.length}</span>
               </div>
             </div>
-            <DropZone id="zone-pool" className="flex-1 overflow-y-auto max-h-[500px] divide-y divide-gray-100">
+            <div className="flex-1 overflow-y-auto max-h-[500px] divide-y divide-gray-100">
               {unusedSpots.length === 0 && <div className="p-3 text-[10px] text-gray-300 text-center">全て配置済み</div>}
               {unusedSpots.slice(0, 50).map((spot) => (
                 <SortableItem key={makePoolItemId(spot.id)} id={makePoolItemId(spot.id)}>
-                  <PoolCard spot={spot} />
+                  <div className="flex items-center gap-2 px-2 py-1.5 cursor-grab active:cursor-grabbing hover:bg-gray-100">
+                    <span className="text-xs">{SPOT_ICONS[spot.type]}</span>
+                    <span className="text-xs text-gray-700 truncate flex-1">{spot.name}</span>
+                    <span className="text-[9px] text-gray-400 flex-shrink-0">{spot.score}</span>
+                  </div>
                 </SortableItem>
               ))}
-            </DropZone>
+            </div>
           </div>
 
           {/* 日別カラム */}
@@ -324,15 +213,33 @@ export default function DayPlannerBoard({
                   </div>
                 </div>
 
-                <DropZone id={`zone-day-${dayIdx}`} className="flex-1 min-h-[60px] overflow-y-auto max-h-[500px] divide-y divide-gray-50">
+                <div className="flex-1 min-h-[60px] overflow-y-auto max-h-[500px] divide-y divide-gray-50">
                   {day.stops.length === 0 && <div className="p-4 text-center text-[10px] text-gray-300">ドロップして追加</div>}
                   {day.stops.map((stop, i) => (
                     <SortableItem key={makeDayItemId(dayIdx, stop.spotId)} id={makeDayItemId(dayIdx, stop.spotId)}>
-                      <StopCard stop={stop} index={i} optimized={optimized}
-                        onRemove={() => handleRemove(dayIdx, stop.spotId)} />
+                      <div className="flex items-start gap-2 px-2 py-1.5 bg-white cursor-grab active:cursor-grabbing">
+                        <div className="flex flex-col items-center flex-shrink-0">
+                          <div className="w-5 h-5 rounded-full bg-[#1B2A4A] text-white text-[10px] flex items-center justify-center font-bold">{i + 1}</div>
+                          {i < day.stops.length - 1 && <div className="w-px h-4 bg-gray-200 mt-0.5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs">{SPOT_ICONS[stop.spot.type]}</span>
+                            <span className="text-xs text-gray-800 truncate">{stop.spot.name}</span>
+                          </div>
+                          {optimized && stop.startTime && <div className="text-[9px] text-gray-400">{stop.startTime} ・ {stop.duration}分</div>}
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemove(dayIdx, stop.spotId); }}
+                          className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0 p-0.5"
+                          onPointerDown={(e) => e.stopPropagation()}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </SortableItem>
                   ))}
-                </DropZone>
+                </div>
 
                 {day.stops.length >= 2 && (
                   <div className="p-2 border-t border-gray-100 space-y-1">
@@ -364,8 +271,8 @@ export default function DayPlannerBoard({
       {/* 訴求ポイント生成ボタン */}
       {days.length > 0 && hasAnalysis && (!spotAdvice || Object.keys(spotAdvice).length === 0) && !adviceLoading && (
         <div className="mt-4">
-          <button onClick={onGenerateAdvice} disabled={adviceLoading}
-            className="w-full py-3 text-sm font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-colors disabled:opacity-50 shadow-sm">
+          <button onClick={onGenerateAdvice}
+            className="w-full py-3 text-sm font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-colors shadow-sm">
             💡 訴求ポイントを作成する
           </button>
         </div>
@@ -414,13 +321,12 @@ export default function DayPlannerBoard({
         </div>
       )}
 
-      {/* ドラッグオーバーレイ（実際のカードを表示） */}
-      <DragOverlay dropAnimation={null}>
-        {dragItem?.type === "stop" && (
-          <StopCard stop={dragItem.stop} index={dragItem.index} optimized={optimized} isOverlay />
-        )}
-        {dragItem?.type === "pool" && (
-          <PoolCard spot={dragItem.spot} isOverlay />
+      <DragOverlay>
+        {activeItem && (
+          <div className="flex items-center gap-2 bg-white border-2 border-[#1B2A4A] shadow-lg rounded-lg px-3 py-2">
+            <span className="text-sm">{activeItem.icon}</span>
+            <span className="text-sm font-medium text-gray-800">{activeItem.label}</span>
+          </div>
         )}
       </DragOverlay>
     </DndContext>
