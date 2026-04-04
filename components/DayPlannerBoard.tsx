@@ -57,7 +57,6 @@ function SortableItem({ id, children }: { id: string; children: React.ReactNode 
 interface SpotAdviceData {
   talkPoints: string[];
   avoidTopics: string[];
-  openingLine: string;
 }
 
 interface Props {
@@ -261,6 +260,9 @@ export default function DayPlannerBoard({
                           </button>
                         </div>
                         {/* トーク提案 */}
+                        {!advice && adviceLoading && (
+                          <div className="ml-7 mt-1 text-[9px] text-gray-400 animate-pulse">💡 アドバイス生成中...</div>
+                        )}
                         {advice && (
                           <div className="ml-7 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
                             <div className="text-[9px] text-amber-700 font-medium mb-0.5">💡 訴求ポイント</div>

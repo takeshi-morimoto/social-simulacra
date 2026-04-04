@@ -22,6 +22,7 @@ import SpotList from "@/components/SpotList";
 import DayPlannerBoard from "@/components/DayPlannerBoard";
 import { scoreSpots } from "@/lib/scoring";
 import { optimizeRoute, generateMultiDayPlan, fetchOsrmRoute } from "@/lib/route-optimizer";
+import { cacheGet, cacheSet, policyKey } from "@/lib/cache";
 
 const INITIAL_COUNTS: StanceCounts = { "強く賛成": 0, "賛成": 0, "条件付き賛成": 0, "中立": 0, "反対": 0, "強く反対": 0 };
 const INITIAL_CANDIDATE: CandidateProfile = { name: "", party: "", district: "", platform: "" };
@@ -103,7 +104,7 @@ export default function Home() {
   const [generating, setGenerating] = useState(false);
   const [numDays, setNumDays] = useState(3);
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
-  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[]; openingLine: string }>>({});
+  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>({});
   const [adviceLoading, setAdviceLoading] = useState(false);
 
   const scoredSpots = useMemo(() => scoreSpots(rawSpots, timeSlot), [rawSpots, timeSlot]);
@@ -134,12 +135,33 @@ export default function Home() {
     }
   }, [session]);
 
-  // --- ペルソナ生成 ---
+  // --- ペルソナ生成（キャッシュ優先） ---
   const policySectionRef = useRef<HTMLDivElement>(null);
-  const generatePersonas = useCallback(async () => {
+  const [usedCache, setUsedCache] = useState(false);
+
+  const generatePersonas = useCallback(async (forceRefresh = false) => {
     const muni = municipality.trim();
     if (!muni) return;
 
+    // キャッシュ確認
+    if (!forceRefresh) {
+      const cached = cacheGet<{ personas: VoterPersona[]; demographics: ElectionDemographicProfile }>("analysis", muni);
+      if (cached) {
+        setPersonas(cached.personas);
+        setDemographics(cached.demographics);
+        setUsedCache(true);
+        setPersonaResults({});
+        setStanceCounts({ ...INITIAL_COUNTS });
+        setShowStanceBar(false);
+        setAnalysis(null);
+        setShowAnalysis(false);
+        setAgeFilter("all");
+        setOpenSections((prev) => ({ ...prev, policy: true }));
+        return;
+      }
+    }
+
+    setUsedCache(false);
     setIsGeneratingPersonas(true);
     setPersonas([]);
     setDemographics(null);
@@ -160,7 +182,7 @@ export default function Home() {
         const data = await res.json();
         setPersonas(data.personas);
         setDemographics(data.demographics);
-        // 次のセクションを開く
+        cacheSet("analysis", muni, { personas: data.personas, demographics: data.demographics });
         setOpenSections((prev) => ({ ...prev, policy: true }));
       } else {
         alert("地域分析に失敗しました");
@@ -172,12 +194,45 @@ export default function Home() {
     setIsGeneratingPersonas(false);
   }, [municipality, candidateProfile]);
 
-  // --- 政策シミュレーション ---
+  // --- 政策シミュレーション（キャッシュ対応） ---
   const routeSectionRef = useRef<HTMLDivElement>(null);
+
+  // キャッシュから結果を復元するヘルパー
+  const restoreSimulation = useCallback((cached: {
+    personaResults: Record<number, PersonaResponse>;
+    analysis: ElectionAnalysisResponse;
+  }) => {
+    const counts = { ...INITIAL_COUNTS };
+    for (const r of Object.values(cached.personaResults)) {
+      if (r) counts[r.stance as Stance] = (counts[r.stance as Stance] || 0) + 1;
+    }
+    setPersonaResults(cached.personaResults);
+    setStanceCounts(counts);
+    setLoadingPersonas(new Set());
+    setShowStanceBar(true);
+    setShowAnalysis(true);
+    setAnalysis(cached.analysis);
+    setAnalysisLoading(false);
+    setOpenSections((prev) => ({ ...prev, route: true }));
+  }, []);
+
   const runSimulation = useCallback(async () => {
     const pol = policy.trim();
     if (!pol) { alert("公約・政策を入力してください"); return; }
     if (!personas.length) return;
+
+    const cacheKey = `${municipality}:${policyKey(pol)}`;
+
+    // キャッシュ確認
+    const cached = cacheGet<{
+      personaResults: Record<number, PersonaResponse>;
+      analysis: ElectionAnalysisResponse;
+    }>("simulation", cacheKey);
+
+    if (cached) {
+      restoreSimulation(cached);
+      return;
+    }
 
     setIsRunning(true);
     setPersonaResults({});
@@ -237,39 +292,38 @@ export default function Home() {
       if (res.ok) {
         const analysisData = await res.json();
         setAnalysis(analysisData);
-        // 次のセクションを開く
+        // キャッシュ保存（シミュレーション結果+レポートを一体で）
+        cacheSet("simulation", cacheKey, { personaResults: results, analysis: analysisData }, 3);
         setOpenSections((prev) => ({ ...prev, route: true }));
-        // スクロールはしない（ユーザーが自分のペースで進む）
       }
     } catch { /* Analysis failed silently */ }
 
     setAnalysisLoading(false);
     setIsRunning(false);
-  }, [policy, personas, candidateProfile, customData]);
+  }, [policy, personas, candidateProfile, customData, municipality, restoreSimulation]);
 
-  // シミュレーション結果をlocalStorageに保存
-  useEffect(() => {
-    if (analysis && municipality && policy) {
-      try {
-        const saved = JSON.parse(localStorage.getItem("sanbo_simulations") || "{}");
-        saved[municipality] = {
-          policy,
-          approval_rate: analysis.weighted_approval_rate ?? analysis.approval_rate,
-          recommendations: analysis.recommendations,
-          risks: analysis.risks,
-          overall: analysis.overall,
-          age_group_breakdown: analysis.age_group_breakdown,
-          timestamp: Date.now(),
-        };
-        localStorage.setItem("sanbo_simulations", JSON.stringify(saved));
-      } catch { /* ignore */ }
-    }
-  }, [analysis, municipality, policy]);
+  // （シミュレーション結果は上のcacheSetで保存済み）
 
-  // --- スポット取得 ---
+  // --- スポット取得（キャッシュ対応） ---
   const fetchSpots = useCallback(async () => {
     const target = municipality.trim();
     if (!target) return;
+
+    // キャッシュ確認
+    const cached = cacheGet<CampaignSpot[]>("spots", target);
+    if (cached && cached.length > 0) {
+      setRawSpots(cached);
+      setSpotsError("");
+      setSelectedIds(new Set());
+      setDays([]);
+      setActiveDay(0);
+      setRouteGeometry(null);
+      setOptimized(false);
+      setSpotsMunicipality(target);
+      setSpotsLoading(false);
+      return;
+    }
+
     setSpotsLoading(true);
     setSpotsError("");
     setRawSpots([]);
@@ -284,6 +338,7 @@ export default function Home() {
       const data = await res.json();
       if (data.spots && data.spots.length > 0) {
         setRawSpots(data.spots);
+        cacheSet("spots", target, data.spots, 7);
       } else {
         setSpotsError("この地域のスポットデータが見つかりませんでした。");
       }
@@ -296,13 +351,11 @@ export default function Home() {
   }, [municipality]);
 
   // 遊説プランセクションが開かれた時にスポット自動取得
-  const lastFetchedMuni = useRef("");
   useEffect(() => {
-    if (openSections.route && municipality.trim() && lastFetchedMuni.current !== municipality.trim() && !spotsLoading) {
-      lastFetchedMuni.current = municipality.trim();
+    if (openSections.route && municipality.trim() && spotsMunicipality !== municipality.trim() && !spotsLoading && rawSpots.length === 0) {
       fetchSpots();
     }
-  }, [openSections.route, municipality]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openSections.route, municipality, spotsMunicipality, spotsLoading, rawSpots.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
@@ -347,16 +400,25 @@ export default function Home() {
     }
   }, [rawSpots, numDays, fetchRouteForDay]);
 
-  // 日程＋分析結果が揃ったらスポット別アドバイスを自動取得
+  // 日程＋分析結果が揃ったらスポット別アドバイスを自動取得（キャッシュ対応）
   const adviceFetchedRef = useRef("");
+  const daysStopIds = useMemo(() => days.flatMap((d) => d.stops.map((s) => s.spotId)).sort().join(","), [days]);
+
   useEffect(() => {
-    if (!analysis || !policy || days.length === 0) return;
-    // 同じ組み合わせで再取得しない
-    const key = `${policy}:${days.map((d) => d.stops.map((s) => s.spotId).join(",")).join(";")}`;
+    if (!analysis || !policy || days.length === 0 || daysStopIds === "") return;
+    const key = `${policyKey(policy)}:${daysStopIds}`;
     if (adviceFetchedRef.current === key) return;
     adviceFetchedRef.current = key;
 
+    // キャッシュ確認
+    const cached = cacheGet<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>("advice", key);
+    if (cached && Object.keys(cached).length > 0) {
+      setSpotAdvice(cached);
+      return;
+    }
+
     setAdviceLoading(true);
+    setSpotAdvice({});
     const allStops = days.flatMap((d) => d.stops);
     fetch("/api/spot-advice", {
       method: "POST",
@@ -365,14 +427,21 @@ export default function Home() {
         policy,
         analysisRecommendations: analysis.recommendations,
         analysisRisks: analysis.risks,
-        stops: allStops.slice(0, 16),
+        stops: allStops.slice(0, 8),
       }),
     })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data) setSpotAdvice(data.advice || {}); })
-      .catch(() => {})
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        const advice = data.advice || {};
+        setSpotAdvice(advice);
+        if (Object.keys(advice).length > 0) cacheSet("advice", key, advice, 3);
+      })
+      .catch((e) => { console.error("spot-advice error:", e); })
       .finally(() => setAdviceLoading(false));
-  }, [analysis, policy, days]);
+  }, [analysis, policy, daysStopIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDayClick = useCallback(async (dayIndex: number) => {
     setActiveDay(dayIndex);
@@ -459,6 +528,7 @@ export default function Home() {
             isGenerating={isGeneratingPersonas}
             onGenerate={generatePersonas}
             hasPersonas={personas.length > 0}
+            usedCache={usedCache}
           />
 
           {isGeneratingPersonas && (

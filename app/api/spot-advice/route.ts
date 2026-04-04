@@ -11,11 +11,11 @@ interface SpotAdviceRequest {
 }
 
 interface SpotAdvice {
-  spotId: string;
   talkPoints: string[];
   avoidTopics: string[];
-  openingLine: string;
 }
+
+const MAX_SPOTS = 8; // API負荷とトークン制限を考慮
 
 export async function POST(req: NextRequest) {
   const { policy, analysisRecommendations, analysisRisks, stops } = (await req.json()) as SpotAdviceRequest;
@@ -24,51 +24,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // 各スポットの推定来訪者プロファイルを構築
-  const spotContexts = stops.map((stop, i) => {
+  // スポット数を制限
+  const limitedStops = stops.slice(0, MAX_SPOTS);
+
+  const spotContexts = limitedStops.map((stop, i) => {
     const audience = getAudienceProfile(stop.spot.type, stop.startTime);
-    return `${i + 1}. ${stop.spot.name}（${stop.startTime}・${stop.spot.type}）
-   来訪者層: ${audience.demographics}
-   特徴: ${audience.traits}`;
-  }).join("\n\n");
+    return `${i + 1}. ${stop.spot.name}（${stop.startTime}・${stop.spot.type}）→ ${audience.demographics}`;
+  }).join("\n");
 
-  const systemPrompt = `あなたは選挙遊説の戦略アドバイザーです。候補者の政策と、各遊説スポットの来訪者層を踏まえて、各スポットで話すべき内容を具体的にアドバイスしてください。
+  const systemPrompt = `選挙遊説アドバイザー。各スポットの来訪者層に合わせた訴求ポイントを提案。
 
-候補者の政策: ${policy}
+政策: ${policy.slice(0, 200)}
+提言: ${analysisRecommendations.slice(0, 2).join("、")}
+リスク: ${analysisRisks.slice(0, 2).join("、")}
 
-政策シミュレーションからの戦略提言:
-${analysisRecommendations.map((r) => `- ${r}`).join("\n")}
-
-注意すべきリスク:
-${analysisRisks.map((r) => `- ${r}`).join("\n")}
-
-各スポットの情報:
+スポット:
 ${spotContexts}
 
-以下のJSON形式で回答してください。各スポットについて、来訪者層に合わせた具体的なアドバイスを生成してください:
-[
-  {
-    "spotId": "スポットID",
-    "talkPoints": ["話すべきポイント1（20字以内）", "話すべきポイント2", "話すべきポイント3"],
-    "avoidTopics": ["避けるべき話題（20字以内）"],
-    "openingLine": "この場所での演説の出だし例（40字以内）"
-  }
-]`;
+JSON配列で回答。talkPointsは各2個、avoidTopicsは1個、各15字以内:
+[{"talkPoints":["ポイント1","ポイント2"],"avoidTopics":["避ける話題"]}]`;
 
   try {
     const result = await callAnthropic<SpotAdvice[]>(
       systemPrompt,
-      `${stops.length}箇所のスポット別アドバイスを生成してください`,
-      2048,
+      `${limitedStops.length}箇所`,
+      4096,
       true,
     );
 
-    // spotIdを正しくマッピング
     const adviceMap: Record<string, SpotAdvice> = {};
-    stops.forEach((stop, i) => {
+    limitedStops.forEach((stop, i) => {
       const advice = result[i];
       if (advice) {
-        adviceMap[stop.spotId] = { ...advice, spotId: stop.spotId };
+        adviceMap[stop.spotId] = {
+          talkPoints: advice.talkPoints || [],
+          avoidTopics: advice.avoidTopics || [],
+        };
       }
     });
 

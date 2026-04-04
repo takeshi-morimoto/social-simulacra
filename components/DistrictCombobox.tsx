@@ -7,10 +7,11 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
+  onValidChange?: (isValid: boolean) => void;
   loading?: boolean;
 }
 
-export default function DistrictCombobox({ value, onChange, onSubmit, loading }: Props) {
+export default function DistrictCombobox({ value, onChange, onSubmit, onValidChange, loading }: Props) {
   const [electionType, setElectionType] = useState<ElectionType>("shugi");
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -18,8 +19,25 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // 外部からvalueが変わったら同期
-  useEffect(() => { setQuery(value); }, [value]);
+  // 外部からvalueが変わったら同期＋バリデーション
+  useEffect(() => {
+    setQuery(value);
+    if (value.trim()) {
+      // 全選挙種別で完全一致を探す
+      const types: ElectionType[] = ["shugi", "sangi", "chiji", "shicho", "gikai"];
+      const found = types.some((t) => getDistrictsForType(t).includes(value.trim()));
+      onValidChange?.(found);
+      // 一致した選挙種別に切り替え
+      if (found) {
+        for (const t of types) {
+          if (getDistrictsForType(t).includes(value.trim())) {
+            setElectionType(t);
+            break;
+          }
+        }
+      }
+    }
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     return getDistrictsForType(electionType, query).slice(0, 100);
@@ -47,6 +65,7 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
     onChange(district);
     setOpen(false);
     setHighlightIndex(-1);
+    onValidChange?.(true);
     onSubmit(district);
   };
 
@@ -105,6 +124,7 @@ export default function DistrictCombobox({ value, onChange, onSubmit, loading }:
             onChange(e.target.value);
             setOpen(true);
             setHighlightIndex(-1);
+            onValidChange?.(false);
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
