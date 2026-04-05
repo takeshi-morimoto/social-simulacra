@@ -351,7 +351,6 @@ export default function Home() {
     // キャッシュ確認
     const cached = cacheGet<CampaignSpot[]>("spots", target);
     if (cached && cached.length > 0) {
-      console.log("[fetchSpots] cache hit:", cached.length, "spots for", target);
       setRawSpots(cached);
       setSelectedIds(new Set());
       setDays([]);
@@ -374,7 +373,6 @@ export default function Home() {
     const attemptFetch = async (): Promise<CampaignSpot[] | null> => {
       const res = await fetch(`/api/plateau-spots?municipality=${encodeURIComponent(target)}`);
       const data = await res.json();
-      console.log("[fetchSpots] API response:", data.spots?.length ?? 0, "spots for", target);
       if (data.spots && data.spots.length > 0) return data.spots;
       return null;
     };
@@ -383,7 +381,6 @@ export default function Home() {
       let spots = await attemptFetch();
       // リトライ: 空の場合は2秒後に1回だけ再試行
       if (!spots) {
-        console.log("[fetchSpots] empty result, retrying in 2s...");
         await new Promise((r) => setTimeout(r, 2000));
         spots = await attemptFetch();
       }

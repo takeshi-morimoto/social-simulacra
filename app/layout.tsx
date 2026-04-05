@@ -3,7 +3,10 @@ import { Analytics } from "@vercel/analytics/next";
 import AuthSessionProvider from "@/components/SessionProvider";
 import "./globals.css";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sanbo-ai.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "参謀AI｜選挙シミュレーター",
   description: "選挙区を選び、公約を入力すると、AIが生成した有権者ペルソナが反応します。投票率加重による支持率分析で選挙戦略を支援。",
   openGraph: {
