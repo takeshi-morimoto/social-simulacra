@@ -94,21 +94,26 @@ export default function ListenMode({
 
       <AnalysisReport analysis={analysis} demographics={demographics} municipality={municipality} isLoading={false} visible={showAnalysis && !analysisLoading} />
 
-      <div ref={shareCardRef}>
-        <ShareCard
-          municipality={municipality}
-          policy={policy}
-          stanceCounts={filteredStanceCounts}
-          analysis={analysis}
-          demographics={demographics}
-          personas={filteredPersonas}
-          personaResults={personaResults}
-          visible={showAnalysis && !analysisLoading && !!analysis}
-        />
-      </div>
-
+      {/* コンパクトなシェアボタン（フルサイズカードは一番下に移動） */}
       {showAnalysis && !analysisLoading && analysis && (
-        <ShareButtons captureRef={shareCardRef} shareText={shareText} />
+        <div className="mb-6 text-center">
+          <button
+            onClick={() => {
+              const text = shareText;
+              if (navigator.share) {
+                navigator.share({ text }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(text).then(() => alert("シェアテキストをコピーしました"));
+              }
+            }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-[#1B2A4A] text-[#1B2A4A] text-sm font-medium hover:bg-[#1B2A4A] hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            結果をシェア
+          </button>
+        </div>
       )}
     </>
   );
