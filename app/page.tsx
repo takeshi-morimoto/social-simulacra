@@ -781,10 +781,6 @@ export default function Home() {
                 <div className="text-white/50 text-[10px]">スポット</div>
                 <div className="text-white font-bold">{days.reduce((s, d) => s + d.stops.length, 0)}箇所</div>
               </div>
-              <div className="bg-white/10 rounded-lg px-4 py-2">
-                <div className="text-white/50 text-[10px]">推定支持率</div>
-                <div className="text-white font-bold">{analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0}%</div>
-              </div>
             </div>
           </div>
 
