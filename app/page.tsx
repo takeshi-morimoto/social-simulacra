@@ -621,7 +621,6 @@ export default function Home() {
                 personas={personas}
                 personaResults={personaResults}
                 loadingPersonas={loadingPersonas}
-                stanceCounts={stanceCounts}
                 showStanceBar={showStanceBar}
                 analysis={analysis}
                 analysisLoading={analysisLoading}
