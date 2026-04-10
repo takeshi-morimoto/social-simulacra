@@ -91,9 +91,11 @@ export default function PolicyInput({ policy, onPolicyChange, onRun, isRunning }
               if (emptyIdx >= 0) {
                 updateItem(emptyIdx, sample);
               } else {
-                setSlotCount(items.length + 1);
-                // 次のレンダーで新しいスロットにセット
-                setTimeout(() => onPolicyChange(policy + SEPARATOR + sample), 0);
+                // 末尾の空スロットを除いた政策一覧に追加
+                const filled = items.filter((p) => p.trim());
+                const next = [...filled, sample];
+                setSlotCount(next.length);
+                onPolicyChange(next.join(SEPARATOR));
               }
             }}
             className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1 text-[11px] text-gray-600 transition-colors hover:bg-gray-100 cursor-pointer">

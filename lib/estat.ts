@@ -30,6 +30,8 @@ export interface MunicipalityDemographics {
   ageDistribution: { name: string; value: number; count: number }[];
   agingRate: number;
   foreignRate: number;
+  /** 将来有権者数（15〜17歳）。数年以内に有権者になる層。 */
+  futureVoterPopulation: number;
 }
 
 export interface PrefectureTurnout {
@@ -63,10 +65,11 @@ const PREF_MAP: Record<string, string> = {
  * 市区町村名からe-Statの地域コードを検索する
  */
 export async function findAreaCode(municipalityName: string): Promise<{ code: string; name: string } | null> {
-  // 選挙区名から地域名を抽出（例: "東京都第10区" → "東京都", "豊島区議会" → "豊島区"）
+  // 選挙区名から地域名を抽出（例: "東京都第10区" → "東京都", "豊島区長選" → "豊島区"）
+  // 末尾の選挙種別語のみを除去する（"区長選" の "区" を残すため）
   const cleaned = municipalityName
     .replace(/第\d+区$/, "")
-    .replace(/(議会|知事選|市長選|区長選|町長選|村長選|選挙区).*$/, "")
+    .replace(/(知事選|長選|議会|選挙区)$/, "")
     .replace(/\s+/g, "")
     .trim();
 
@@ -147,6 +150,7 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
       "45〜64歳": 0,
       "65歳以上": 0,
     };
+    let futureVoter = 0; // 15〜17歳
 
     for (const v of ageData) {
       const ageCode = parseInt(v["@cat03"]);
@@ -160,6 +164,8 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
       else if (age <= 44) ageCounts["30〜44歳"] += count;
       else if (age <= 64) ageCounts["45〜64歳"] += count;
       else ageCounts["65歳以上"] += count;
+
+      if (age >= 15 && age <= 17) futureVoter += count;
     }
 
     const sumAge = Object.values(ageCounts).reduce((a, b) => a + b, 0) || totalPopulation;
@@ -181,6 +187,7 @@ export async function fetchDemographics(areaCode: string, areaName: string): Pro
       ageDistribution,
       agingRate,
       foreignRate: 0, // 国籍別データは別途取得が必要
+      futureVoterPopulation: futureVoter,
     };
   } catch (e) {
     console.error("fetchDemographics error:", e);
@@ -254,6 +261,7 @@ async function fetchAggregatedDemographics(
     }
 
     let totalPopulation = 0, malePopulation = 0, femalePopulation = 0;
+    let futureVoter = 0;
     const ageCounts: Record<string, number> = {
       "0〜14歳": 0, "15〜29歳": 0, "30〜44歳": 0, "45〜64歳": 0, "65歳以上": 0,
     };
@@ -283,6 +291,7 @@ async function fetchAggregatedDemographics(
         else if (age <= 44) ageCounts["30〜44歳"] += count;
         else if (age <= 64) ageCounts["45〜64歳"] += count;
         else ageCounts["65歳以上"] += count;
+        if (age >= 15 && age <= 17) futureVoter += count;
       }
     }
 
@@ -307,6 +316,7 @@ async function fetchAggregatedDemographics(
       ageDistribution,
       agingRate,
       foreignRate: 0,
+      futureVoterPopulation: futureVoter,
     };
   } catch (e) {
     console.error("fetchAggregatedDemographics error:", e);

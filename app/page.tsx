@@ -24,7 +24,7 @@ import SpotList from "@/components/SpotList";
 import DayPlannerBoard from "@/components/DayPlannerBoard";
 import { scoreSpots } from "@/lib/scoring";
 import { optimizeRoute, generateMultiDayPlan, fetchOsrmRoute } from "@/lib/route-optimizer";
-import { cacheGet, cacheSet, policyKey } from "@/lib/cache";
+import { cacheGet, cacheSet, cacheInvalidate, policyKey } from "@/lib/cache";
 
 const INITIAL_COUNTS: StanceCounts = { "強く賛成": 0, "賛成": 0, "条件付き賛成": 0, "中立": 0, "反対": 0, "強く反対": 0 };
 const INITIAL_CANDIDATE: CandidateProfile = { name: "", party: "", district: "", platform: "" };
@@ -176,6 +176,10 @@ export default function Home() {
         return;
       }
     }
+
+    // ペルソナを再生成する場合は、古いペルソナを前提にした
+    // シミュレーション結果キャッシュも破棄する（同じ政策でも内容が変わるため）
+    cacheInvalidate("simulation", `${muni}:`);
 
     setUsedCache(false);
     setIsGeneratingPersonas(true);

@@ -120,3 +120,37 @@ function normalize(s: string): string {
     .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFFF0 + 0x30))
     .replace(/県|都|府|道|第|区|選挙|長選|議会|知事/g, "");
 }
+
+/**
+ * 選挙区入力文字列から末尾の選挙種別語を取り除き、地名部分のみを返す。
+ * 例: "豊島区長選" → "豊島区"、"横浜市長選" → "横浜市"、"栃木県知事選" → "栃木県"、
+ *     "東京都第10区" → "東京都"、"豊島区議会" → "豊島区"
+ */
+export function stripElectionSuffix(name: string): string {
+  return name
+    .replace(/第\d+区$/, "")
+    .replace(/(知事選|長選|議会|選挙区)$/, "")
+    .trim();
+}
+
+// 市区町村名 → 都道府県名 の逆引きインデックス（遅延構築）
+let _cityToPref: Map<string, string> | null = null;
+function getCityToPrefIndex(): Map<string, string> {
+  if (_cityToPref) return _cityToPref;
+  const idx = new Map<string, string>();
+  for (const [pref, cities] of Object.entries(muniData)) {
+    for (const city of cities) {
+      // 同名市町村は最初に出てきた都道府県を採用（実害ほぼなし）
+      if (!idx.has(city)) idx.set(city, pref);
+    }
+  }
+  _cityToPref = idx;
+  return idx;
+}
+
+/**
+ * 市区町村名から所属都道府県名を返す。見つからない場合 null。
+ */
+export function findPrefForMunicipality(municipalityName: string): string | null {
+  return getCityToPrefIndex().get(municipalityName) || null;
+}

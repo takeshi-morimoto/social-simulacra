@@ -59,10 +59,12 @@ export async function POST(req: NextRequest) {
 総人口: ${estatData.totalPopulation.toLocaleString()}人
 男性: ${estatData.malePopulation.toLocaleString()}人 / 女性: ${estatData.femalePopulation.toLocaleString()}人
 高齢化率: ${estatData.agingRate}%
+将来有権者数（15〜17歳・数年以内に有権者）: ${estatData.futureVoterPopulation.toLocaleString()}人
 年齢分布:
 ${estatData.ageDistribution.map((a) => `  ${a.name}: ${a.value}%（${a.count.toLocaleString()}人）`).join("\n")}
 
 ※上記は国勢調査の実データです。demographicsのage_distributionやgender_distributionはこのデータを正確に反映してください。
+※future_voter_population には上記の15〜17歳の人数を「約X,XXX人」形式で必ず設定してください。
 ※ペルソナの年齢・性別配分もこの実データの比率に忠実に従ってください。`
     : "";
 
@@ -116,6 +118,7 @@ ${turnoutData.mayor ? `市区町村長選: ${turnoutData.mayor}%` : ""}
   "demographics": {
     "population": "人口（例：約7,000人）",
     "voter_population": "有権者数（例：約5,800人）",
+    "future_voter_population": "数年以内に有権者となる15〜17歳の人数（例：約180人）",
     "aging_rate": "高齢化率（例：約52%）",
     "main_industries": ["主要産業を3つ以内"],
     "foreign_rate": "外国人比率（例：約1.5%）",
@@ -140,7 +143,12 @@ ${turnoutData.mayor ? `市区町村長選: ${turnoutData.mayor}%` : ""}
     ],
     "industry_distribution": [
       {"name":"産業名","value":数値（%）},
-      ...主要な産業を3〜5個、合計100%になるように
+      ...主要な産業を3〜5個、就業者数ベースの比率で合計100%になるように
+    ],
+    "industry_sales_distribution": [
+      {"name":"産業名","value":数値（%）},
+      ...同じ自治体の産業を3〜5個、売上高（経済規模）ベースの比率で合計100%になるように。
+      ※就業者比率と売上比率は必ずしも一致しないことに注意（例：農業は就業者比率が高くても売上比率は低い、製造業は逆になりがち）
     ],
     "voter_turnout_rates": [
       {"ageGroup":"18〜29歳","male":数値,"female":数値,"overall":数値},
@@ -185,9 +193,15 @@ ${turnoutData.mayor ? `市区町村長選: ${turnoutData.mayor}%` : ""}
       };
     });
 
+    // e-Statから実数値が取れていれば、LLMの推定値を実データで上書きする
+    const demographics = { ...result.demographics };
+    if (estatData && estatData.futureVoterPopulation > 0) {
+      demographics.future_voter_population = `約${estatData.futureVoterPopulation.toLocaleString()}人`;
+    }
+
     return NextResponse.json({
       personas,
-      demographics: result.demographics,
+      demographics,
     });
   } catch (e) {
     console.error("Generate personas error:", e);

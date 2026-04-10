@@ -64,7 +64,12 @@ export interface DemographicProfile {
   rationale: string;
   age_distribution: ChartSegment[];
   gender_distribution: ChartSegment[];
+  /** 産業構成（就業者比率ベース） */
   industry_distribution: ChartSegment[];
+  /** 産業構成（売上ベース・経済規模の観点） */
+  industry_sales_distribution?: ChartSegment[];
+  /** 将来有権者（数年先に有権者となる15〜17歳）の人数。 */
+  future_voter_population?: string;
 }
 
 export interface VoterTurnoutRate {

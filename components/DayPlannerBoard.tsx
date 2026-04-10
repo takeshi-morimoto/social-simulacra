@@ -280,8 +280,12 @@ export default function DayPlannerBoard({
 
       </SortableContext>
 
-      {/* 訴求ポイント生成ボタン */}
-      {days.length > 0 && hasAnalysis && (!spotAdvice || Object.keys(spotAdvice).length === 0) && !adviceLoading && (
+      {/* 訴求ポイント生成ボタン
+          現在の遊説コースのスポットに対応する advice が無ければ表示する。
+          localStorage に過去コースの advice が残っていてもボタンが消えないように、
+          「現在の stops にマッチする advice の有無」で判定する。 */}
+      {days.length > 0 && hasAnalysis && !adviceLoading &&
+        !days.flatMap((d) => d.stops).some((s) => spotAdvice?.[s.spotId]) && (
         <div className="mt-4">
           <button onClick={onGenerateAdvice}
             className="w-full py-3 text-sm font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-colors shadow-sm">
@@ -291,7 +295,8 @@ export default function DayPlannerBoard({
       )}
 
       {/* 全日程の訴求ポイント */}
-      {days.length > 0 && (spotAdvice && Object.keys(spotAdvice).length > 0 || adviceLoading) && (
+      {days.length > 0 && (adviceLoading ||
+        days.flatMap((d) => d.stops).some((s) => spotAdvice?.[s.spotId])) && (
         <div className="mt-4 space-y-4">
           {days.map((day) => (
             <div key={day.dayNumber} className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">

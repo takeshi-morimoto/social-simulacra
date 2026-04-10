@@ -55,7 +55,7 @@ export default function DemographicsPanel({ demographics, municipality }: Props)
       <div className="mb-4 text-sm font-semibold text-gray-800">{municipality} の人口動態・産業構造</div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 mb-5">
         <div className="rounded-md bg-gray-50 px-3 py-2">
           <div className="text-[10px] text-gray-400">人口</div>
           <div className="text-sm font-semibold text-gray-800">{demographics.population}</div>
@@ -64,6 +64,12 @@ export default function DemographicsPanel({ demographics, municipality }: Props)
           <div className="text-[10px] text-gray-400">有権者数</div>
           <div className="text-sm font-semibold text-[#1B2A4A]">{demographics.voter_population || "—"}</div>
         </div>
+        {demographics.future_voter_population && (
+          <div className="rounded-md bg-sky-50 border border-sky-100 px-3 py-2" title="数年以内に有権者となる15〜17歳">
+            <div className="text-[10px] text-sky-600">将来有権者(15-17歳)</div>
+            <div className="text-sm font-semibold text-sky-800">{demographics.future_voter_population}</div>
+          </div>
+        )}
         <div className="rounded-md bg-gray-50 px-3 py-2">
           <div className="text-[10px] text-gray-400">高齢化率</div>
           <div className="text-sm font-semibold text-gray-800">{demographics.aging_rate}</div>
@@ -91,14 +97,21 @@ export default function DemographicsPanel({ demographics, municipality }: Props)
       )}
 
       {/* Pie Charts */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-5">
         <MiniPieChart
           data={demographics.voter_age_distribution || demographics.age_distribution}
           colors={AGE_COLORS}
           title="有権者年齢構成"
         />
         <MiniPieChart data={demographics.gender_distribution} colors={GENDER_COLORS} title="性別構成" />
-        <MiniPieChart data={demographics.industry_distribution} colors={INDUSTRY_COLORS} title="産業構成" />
+        <MiniPieChart data={demographics.industry_distribution} colors={INDUSTRY_COLORS} title="産業構成（就業者比率）" />
+        {demographics.industry_sales_distribution && demographics.industry_sales_distribution.length > 0 && (
+          <MiniPieChart
+            data={demographics.industry_sales_distribution}
+            colors={INDUSTRY_COLORS}
+            title="産業構成（売上ベース）"
+          />
+        )}
       </div>
 
       {/* Industries */}

@@ -20,6 +20,21 @@ export function cacheGet<T>(prefix: string, key: string): T | null {
   }
 }
 
+/**
+ * 指定プレフィックスでキー前方一致するエントリを全削除する。
+ * 例: cacheInvalidate("simulation", "豊島区長選:") で
+ *     その自治体の全シミュレーションキャッシュを破棄。
+ */
+export function cacheInvalidate(prefix: string, keyPrefix: string): void {
+  const fullPrefix = `${prefix}:${keyPrefix}`;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(fullPrefix)) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+}
+
 export function cacheSet<T>(prefix: string, key: string, data: T, ttlDays = DEFAULT_TTL_DAYS): void {
   try {
     localStorage.setItem(`${prefix}:${key}`, JSON.stringify({
@@ -57,13 +72,15 @@ function cleanOldCache(prefix: string): void {
 }
 
 /**
- * 政策テキストからキャッシュキーを生成（長い政策をハッシュ化）
+ * 政策テキストからキャッシュキーを生成。
+ * 長さも seed に含めて全文をハッシュするので、複数政策や長文でも
+ * 末尾の変更がキーに反映される（衝突して古いキャッシュが返るのを防ぐ）。
  */
 export function policyKey(policy: string): string {
-  let hash = 0;
-  const s = policy.trim().slice(0, 500);
+  const s = policy.trim();
+  let hash = s.length;
   for (let i = 0; i < s.length; i++) {
     hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
   }
-  return Math.abs(hash).toString(36);
+  return `${s.length.toString(36)}_${Math.abs(hash).toString(36)}`;
 }
