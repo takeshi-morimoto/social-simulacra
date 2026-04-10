@@ -75,16 +75,10 @@ export default function Home() {
   const [candidateProfile, setCandidateProfile] = useState<CandidateProfile>({ ...INITIAL_CANDIDATE });
   const [customData, setCustomData] = useState("");
   const [ageFilter, setAgeFilter] = useState<AgeGroupFilter>("all");
-  const [profileBannerDismissed, setProfileBannerDismissed] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("profileBannerDismissed") === "true";
-    return false;
-  });
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
 
   // --- 政策テスト ---
-  const [policy, setPolicy] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("sanbo_policy") || "";
-  });
+  const [policy, setPolicy] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [personaResults, setPersonaResults] = useState<Record<number, PersonaResponse | null>>({});
   const [loadingPersonas, setLoadingPersonas] = useState<Set<number>>(new Set());
@@ -101,10 +95,7 @@ export default function Home() {
   const [spotsLoading, setSpotsLoading] = useState(false);
   const [spotsError, setSpotsError] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [days, setDays] = useState<CampaignDay[]>(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("sanbo_days") || "[]"); } catch { return []; }
-  });
+  const [days, setDays] = useState<CampaignDay[]>([]);
   const [activeDay, setActiveDay] = useState(0);
   const [routeGeometry, setRouteGeometry] = useState<[number, number][] | null>(null);
   const [optimized, setOptimized] = useState(false);
@@ -112,11 +103,25 @@ export default function Home() {
   const [generating, setGenerating] = useState(false);
   const [numDays, setNumDays] = useState(3);
   const [hoveredSpotId, setHoveredSpotId] = useState<string | null>(null);
-  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>(() => {
-    if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("sanbo_spotAdvice") || "{}"); } catch { return {}; }
-  });
+  const [spotAdvice, setSpotAdvice] = useState<Record<string, { talkPoints: string[]; avoidTopics: string[] }>>({});
   const [adviceLoading, setAdviceLoading] = useState(false);
+
+  // localStorageからの復元はマウント後に行う（SSRハイドレーションエラー回避）
+  useEffect(() => {
+    if (localStorage.getItem("profileBannerDismissed") === "true") {
+      setProfileBannerDismissed(true);
+    }
+    const savedPolicy = localStorage.getItem("sanbo_policy");
+    if (savedPolicy) setPolicy(savedPolicy);
+    try {
+      const savedDays = JSON.parse(localStorage.getItem("sanbo_days") || "[]");
+      if (Array.isArray(savedDays) && savedDays.length > 0) setDays(savedDays);
+    } catch { /* ignore */ }
+    try {
+      const savedAdvice = JSON.parse(localStorage.getItem("sanbo_spotAdvice") || "{}");
+      if (savedAdvice && typeof savedAdvice === "object") setSpotAdvice(savedAdvice);
+    } catch { /* ignore */ }
+  }, []);
 
   const scoredSpots = useMemo(() => scoreSpots(rawSpots, timeSlot), [rawSpots, timeSlot]);
   const maxDays = useMemo(() => Math.min(Math.floor(rawSpots.length / 5), 14), [rawSpots]);
