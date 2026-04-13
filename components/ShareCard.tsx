@@ -1,6 +1,7 @@
 "use client";
 
 import type { VoterPersona, PersonaResponse, StanceCounts, ElectionAnalysisResponse, ElectionDemographicProfile } from "@/lib/types";
+import { estimateWinRate } from "@/lib/election-stats";
 
 interface Props {
   municipality: string;
@@ -54,7 +55,8 @@ function getRepresentativeOpinion(
 function BgIllustrations() {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.06 }}>
-      <svg className="absolute bottom-0 right-2" width="280" height="180" viewBox="0 0 180 120" fill="none">
+      {/* ビル群（右下） — モバイルでは縮小 */}
+      <svg className="absolute bottom-0 right-1 w-[40%] sm:w-[35%] max-w-[280px] h-auto" viewBox="0 0 180 120" fill="none">
         <rect x="10" y="40" width="30" height="80" rx="3" fill="currentColor" />
         <rect x="16" y="48" width="8" height="8" rx="1" fill="white" />
         <rect x="16" y="62" width="8" height="8" rx="1" fill="white" />
@@ -81,13 +83,15 @@ function BgIllustrations() {
         <rect x="152" y="56" width="8" height="8" rx="1" fill="white" />
         <polygon points="95,55 107,38 120,55" fill="currentColor" />
       </svg>
-      <svg className="absolute top-4 left-4" width="150" height="110" viewBox="0 0 100 80" fill="none">
+      {/* 吹き出し（左上） */}
+      <svg className="absolute top-4 left-2 sm:left-4 w-[25%] sm:w-[20%] max-w-[150px] h-auto" viewBox="0 0 100 80" fill="none">
         <ellipse cx="40" cy="25" rx="35" ry="22" fill="currentColor" />
         <polygon points="30,44 25,60 42,42" fill="currentColor" />
         <ellipse cx="72" cy="50" rx="24" ry="16" fill="currentColor" />
         <polygon points="75,64 80,76 68,62" fill="currentColor" />
       </svg>
-      <svg className="absolute bottom-2 left-6" width="180" height="90" viewBox="0 0 120 60" fill="none">
+      {/* 人影（左下） */}
+      <svg className="absolute bottom-1 left-2 sm:left-6 w-[35%] sm:w-[25%] max-w-[180px] h-auto" viewBox="0 0 120 60" fill="none">
         <circle cx="20" cy="15" r="8" fill="currentColor" />
         <ellipse cx="20" cy="42" rx="12" ry="18" fill="currentColor" />
         <circle cx="55" cy="18" r="7" fill="currentColor" />
@@ -97,7 +101,8 @@ function BgIllustrations() {
         <circle cx="110" cy="20" r="6" fill="currentColor" />
         <ellipse cx="110" cy="44" rx="9" ry="16" fill="currentColor" />
       </svg>
-      <svg className="absolute top-6 right-16" width="100" height="100" viewBox="0 0 60 60" fill="none">
+      {/* ドット装飾（右上） */}
+      <svg className="absolute top-4 right-4 sm:right-16 w-[15%] sm:w-[12%] max-w-[100px] h-auto" viewBox="0 0 60 60" fill="none">
         <circle cx="10" cy="10" r="4" fill="currentColor" />
         <circle cx="40" cy="8" r="3" fill="currentColor" />
         <circle cx="25" cy="35" r="5" fill="currentColor" />
@@ -129,9 +134,8 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
     : 0.55;
   const estimatedVotes = voterPop > 0 ? Math.round(voterPop * avgTurnout * displayRate / 100) : null;
 
-  // 当選率（シグモイド）
-  const threshold = municipality?.includes("議会") ? 8 : municipality?.includes("知事") ? 40 : 35;
-  const winRate = Math.round(Math.min(Math.max(1 / (1 + Math.exp(-0.15 * (displayRate - threshold))) * 100, 1), 99));
+  // 当選率（lib/election-stats.ts のキャリブレーション済モデル）
+  const winRate = estimateWinRate(displayRate, personas?.length ?? 15, municipality);
 
   return (
     <div className="mb-6" style={{ aspectRatio: "1200 / 630" }}>

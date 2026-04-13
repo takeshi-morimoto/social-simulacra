@@ -268,6 +268,7 @@ export default function Home() {
     setLoadingPersonas(new Set(personas.map((p) => p.id)));
 
     const results: Record<number, PersonaResponse> = {};
+    let personasOk = false;
 
     try {
       const res = await fetch("/api/personas-batch", {
@@ -278,7 +279,9 @@ export default function Home() {
           customData: customData.trim() ? { text: customData.trim() } : undefined,
         }),
       });
+      if (!res.ok) throw new Error(`personas-batch ${res.status}`);
       const data: Record<string, PersonaResponse> = await res.json();
+      personasOk = true;
 
       for (const persona of personas) {
         const r = data[String(persona.id)] ?? {
@@ -290,16 +293,25 @@ export default function Home() {
         setPersonaResults((prev) => ({ ...prev, [persona.id]: r }));
         setStanceCounts((prev) => ({ ...prev, [r.stance]: prev[r.stance as Stance] + 1 }));
       }
-    } catch {
+    } catch (e) {
+      console.error("personas-batch error:", e);
       for (const persona of personas) {
         const fallback: PersonaResponse = { opinion: "（通信エラーのため回答を取得できませんでした）", stance: "中立", tags: ["エラー"] };
         results[persona.id] = fallback;
         setPersonaResults((prev) => ({ ...prev, [persona.id]: fallback }));
       }
+      alert("ペルソナの反応生成に失敗しました。政策内容を簡潔にして再度お試しください。");
     }
 
     setLoadingPersonas(new Set());
     setShowStanceBar(true);
+
+    // ペルソナ反応取得に失敗した場合はサマリー生成・キャッシュ保存をスキップ
+    if (!personasOk) {
+      setIsRunning(false);
+      return;
+    }
+
     setShowAnalysis(true);
     setAnalysisLoading(true);
 
@@ -317,7 +329,7 @@ export default function Home() {
       if (res.ok) {
         const analysisData = await res.json();
         setAnalysis(analysisData);
-        // キャッシュ保存（シミュレーション結果+レポートを一体で）
+        // キャッシュ保存は成功時のみ
         cacheSet("simulation", cacheKey, { personaResults: results, analysis: analysisData }, 3);
         setOpenSections((prev) => ({ ...prev, route: true }));
       }

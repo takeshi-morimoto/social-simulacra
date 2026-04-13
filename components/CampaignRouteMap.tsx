@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { CampaignSpot, RouteStop } from "@/lib/types";
+import { stripElectionSuffix, findPrefForMunicipality } from "@/lib/election-districts";
 
 const CampaignRouteMapContent = dynamic(() => import("./CampaignRouteMapContent"), { ssr: false });
 
@@ -23,22 +24,33 @@ interface Props {
   onSpotHover?: (spotId: string | null) => void;
 }
 
-// 都道府県コードを抽出
+const PREF_CODE_MAP: Record<string, string> = {
+  "北海道": "01", "青森": "02", "岩手": "03", "宮城": "04", "秋田": "05",
+  "山形": "06", "福島": "07", "茨城": "08", "栃木": "09", "群馬": "10",
+  "埼玉": "11", "千葉": "12", "東京": "13", "神奈川": "14", "新潟": "15",
+  "富山": "16", "石川": "17", "福井": "18", "山梨": "19", "長野": "20",
+  "岐阜": "21", "静岡": "22", "愛知": "23", "三重": "24", "滋賀": "25",
+  "京都": "26", "大阪": "27", "兵庫": "28", "奈良": "29", "和歌山": "30",
+  "鳥取": "31", "島根": "32", "岡山": "33", "広島": "34", "山口": "35",
+  "徳島": "36", "香川": "37", "愛媛": "38", "高知": "39", "福岡": "40",
+  "佐賀": "41", "長崎": "42", "熊本": "43", "大分": "44", "宮崎": "45",
+  "鹿児島": "46", "沖縄": "47",
+};
+
+// 都道府県コードを抽出。入力に都道府県名が無い場合（"豊島区長選" など）は
+// 市区町村名から逆引きする
 function getPrefCode(name: string): string | null {
-  const prefMap: Record<string, string> = {
-    "北海道": "01", "青森": "02", "岩手": "03", "宮城": "04", "秋田": "05",
-    "山形": "06", "福島": "07", "茨城": "08", "栃木": "09", "群馬": "10",
-    "埼玉": "11", "千葉": "12", "東京": "13", "神奈川": "14", "新潟": "15",
-    "富山": "16", "石川": "17", "福井": "18", "山梨": "19", "長野": "20",
-    "岐阜": "21", "静岡": "22", "愛知": "23", "三重": "24", "滋賀": "25",
-    "京都": "26", "大阪": "27", "兵庫": "28", "奈良": "29", "和歌山": "30",
-    "鳥取": "31", "島根": "32", "岡山": "33", "広島": "34", "山口": "35",
-    "徳島": "36", "香川": "37", "愛媛": "38", "高知": "39", "福岡": "40",
-    "佐賀": "41", "長崎": "42", "熊本": "43", "大分": "44", "宮崎": "45",
-    "鹿児島": "46", "沖縄": "47",
-  };
-  for (const [name2, code] of Object.entries(prefMap)) {
-    if (name.includes(name2)) return code;
+  for (const [pref, code] of Object.entries(PREF_CODE_MAP)) {
+    if (name.includes(pref)) return code;
+  }
+  const stripped = stripElectionSuffix(name);
+  if (stripped) {
+    const prefName = findPrefForMunicipality(stripped);
+    if (prefName) {
+      for (const [pref, code] of Object.entries(PREF_CODE_MAP)) {
+        if (prefName.includes(pref)) return code;
+      }
+    }
   }
   return null;
 }
@@ -63,11 +75,8 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
       return;
     }
 
-    const searchQuery = municipality
-      .replace(/第\d+区$/, "")
-      .replace(/(議会|知事選|市長選|区長選|町長選|村長選).*$/, "")
-      .replace(/選挙区$/, "")
-      .trim();
+    // 末尾の選挙種別語のみ除去（"豊島区長選" → "豊島区"。"区"を残すのが重要）
+    const searchQuery = stripElectionSuffix(municipality);
 
     setLoading(true);
     setGeoData(null);
@@ -76,8 +85,15 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
     const districtNum = extractDistrictNumber(municipality);
     const isShuugiin = /第\d+区/.test(municipality);
 
+    // 同名地名（例: 豊島区 vs 香川県の豊島）の取り違えを防ぐため、
+    // 都道府県名がわかれば必ずクエリに含める
+    const prefName = findPrefForMunicipality(searchQuery);
+    const geocodeQuery = prefName && !searchQuery.startsWith(prefName)
+      ? `${prefName}${searchQuery} Japan`
+      : `${searchQuery} Japan`;
+
     const geocodePromise = fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + " Japan")}&limit=1`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=1`,
       { headers: { "Accept-Language": "ja" } },
     )
       .then((r) => r.json())

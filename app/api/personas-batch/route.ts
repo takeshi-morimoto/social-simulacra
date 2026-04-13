@@ -57,18 +57,23 @@ ${personaList}
   ${personas.map((p) => `"${p.id}": {"opinion":"意見（1〜2文）","stance":"強く賛成/賛成/条件付き賛成/中立/反対/強く反対","tags":["2個のキーワード"]}`).join(",\n  ")}
 }`;
 
+  // 政策が複数あると応答が長くなりがちなので、政策数に応じて余裕を持たせる
+  const maxTokens = Math.min(8000, 3000 + policies.length * 1500);
+
   try {
-    const result = await callAnthropic<BatchResponse>(systemPrompt, `公約・政策：\n${policyList}`, 4096);
-    return NextResponse.json(result);
-  } catch {
-    const fallback: BatchResponse = {};
-    for (const p of personas) {
-      fallback[p.id] = {
-        opinion: "（通信エラーのため回答を取得できませんでした）",
-        stance: "中立",
-        tags: ["エラー"],
-      };
+    const result = await callAnthropic<BatchResponse>(systemPrompt, `公約・政策：\n${policyList}`, maxTokens);
+    // 取得できたペルソナ反応が極端に少ない場合（部分復旧で半分以下）はエラー扱い
+    const validKeys = Object.keys(result).filter((k) => result[Number(k)]?.opinion);
+    if (validKeys.length < Math.ceil(personas.length / 2)) {
+      throw new Error(`Too few valid persona responses: ${validKeys.length}/${personas.length}`);
     }
-    return NextResponse.json(fallback);
+    return NextResponse.json(result);
+  } catch (e) {
+    console.error("[personas-batch] callAnthropic failed:", e);
+    // 500 を返してクライアント側のエラー処理を発火させる（キャッシュにも残らない）
+    return NextResponse.json(
+      { error: (e as Error).message || "personas-batch failed" },
+      { status: 500 },
+    );
   }
 }

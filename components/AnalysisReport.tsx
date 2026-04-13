@@ -1,43 +1,15 @@
 "use client";
 
 import type { ElectionAnalysisResponse, ElectionDemographicProfile, AgeGroupResult } from "@/lib/types";
+import { estimateWinRate } from "@/lib/election-stats";
 
 interface Props {
   analysis: ElectionAnalysisResponse | null;
   demographics?: ElectionDemographicProfile | null;
   municipality?: string;
+  sampleSize?: number;
   isLoading: boolean;
   visible: boolean;
-}
-
-/**
- * 選挙種別を推定し、当選率を算出
- * 支持率→当選率はシグモイド関数で変換（当選ラインを中心に急勾配）
- */
-function estimateWinRate(approvalRate: number, municipality?: string): number {
-  // 選挙種別ごとの当選ライン（この支持率で当選確率50%）
-  let threshold = 35; // デフォルト: 衆議院小選挙区
-
-  if (municipality) {
-    if (/議会/.test(municipality)) {
-      // 市区町村議会: 定数が多いので低い支持率でも当選
-      threshold = 8;
-    } else if (/知事選/.test(municipality)) {
-      // 知事選: 事実上2択が多い
-      threshold = 40;
-    } else if (/長選/.test(municipality)) {
-      // 市区町村長選: 2-3人の争い
-      threshold = 35;
-    } else if (/選挙区/.test(municipality) && !(/第\d+区/.test(municipality))) {
-      // 参議院選挙区
-      threshold = 30;
-    }
-  }
-
-  // シグモイド関数: threshold付近で急勾配、両端で飽和
-  const k = 0.15; // 勾配の急さ
-  const raw = 1 / (1 + Math.exp(-k * (approvalRate - threshold)));
-  return Math.round(Math.min(Math.max(raw * 100, 1), 99)); // 1-99%に制限
 }
 
 /**
@@ -110,12 +82,12 @@ function AgeGroupRow({ group }: { group: AgeGroupResult }) {
   );
 }
 
-export default function AnalysisReport({ analysis, demographics, municipality, isLoading, visible }: Props) {
+export default function AnalysisReport({ analysis, demographics, municipality, sampleSize, isLoading, visible }: Props) {
   if (!visible) return null;
 
   const approvalRate = analysis?.weighted_approval_rate ?? analysis?.approval_rate ?? 0;
   const votes = analysis ? estimateVotes(demographics, approvalRate) : null;
-  const winRate = analysis ? estimateWinRate(approvalRate, municipality) : null;
+  const winRate = analysis ? estimateWinRate(approvalRate, sampleSize ?? 15, municipality) : null;
 
   return (
     <div className="animate-fade-in rounded-lg border border-gray-200 bg-white p-5 shadow-sm mb-6">

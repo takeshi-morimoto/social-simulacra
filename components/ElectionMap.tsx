@@ -67,6 +67,35 @@ const SENKYOKU_BASE = "/geojson/senkyoku";
 // 市区町村GeoJSON（smartnews-smri）
 const MUNICIPALITY_BASE = "https://raw.githubusercontent.com/smartnews-smri/japan-topography/main/data/municipality/geojson/s0010";
 
+/**
+ * GeoJSONのバウンディングボックスから中心点を計算する。
+ * Nominatim 経由のジオコーディングが失敗した時の fallback として使う。
+ */
+function computeFallbackLocation(geo: GeoJSON.FeatureCollection): GeoLocation | null {
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  const visitCoord = (coord: GeoJSON.Position) => {
+    const [lng, lat] = coord;
+    if (typeof lat !== "number" || typeof lng !== "number") return;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+  };
+  const visitGeometry = (g: GeoJSON.Geometry) => {
+    if (g.type === "Polygon") g.coordinates.forEach((ring) => ring.forEach(visitCoord));
+    else if (g.type === "MultiPolygon") g.coordinates.forEach((poly) => poly.forEach((ring) => ring.forEach(visitCoord)));
+  };
+  for (const f of geo.features) {
+    if (f.geometry) visitGeometry(f.geometry);
+  }
+  if (!isFinite(minLat) || !isFinite(minLng)) return null;
+  return {
+    lat: (minLat + maxLat) / 2,
+    lng: (minLng + maxLng) / 2,
+    displayName: "",
+  };
+}
+
 export default function ElectionMap({ municipality }: Props) {
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -89,9 +118,16 @@ export default function ElectionMap({ municipality }: Props) {
     const electionType = getElectionType(municipality);
     const districtNum = extractDistrictNumber(municipality);
 
+    // 同名地名（例: 豊島区 vs 香川県の豊島）の取り違えを防ぐため、
+    // 都道府県名がわかれば必ずクエリに含める
+    const prefName = findPrefForMunicipality(searchQuery);
+    const geocodeQuery = prefName && !searchQuery.startsWith(prefName)
+      ? `${prefName}${searchQuery} Japan`
+      : `${searchQuery} Japan`;
+
     // ジオコーディングとGeoJSON取得を並行実行
     const geocodePromise = fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery + " Japan")}&limit=1`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(geocodeQuery)}&limit=1`,
       { headers: { "Accept-Language": "ja" } },
     )
       .then((r) => r.json())
@@ -155,7 +191,14 @@ export default function ElectionMap({ municipality }: Props) {
 
     Promise.all([geocodePromise, geoPromise])
       .then(([loc, geo]) => {
-        setLocation(loc);
+        // GeoJSON が取得できていれば、Nominatim が失敗していても
+        // GeoJSON の中心点を fallback として使う
+        if (!loc && geo && geo.features.length > 0) {
+          const fallback = computeFallbackLocation(geo);
+          setLocation(fallback);
+        } else {
+          setLocation(loc);
+        }
         setGeoData(geo);
       })
       .finally(() => setLoading(false));
@@ -163,16 +206,22 @@ export default function ElectionMap({ municipality }: Props) {
 
   if (!municipality) return null;
 
+  // 地図表示は location か geoData のどちらかがあれば行う
+  const hasMapData = !loading && (location || (geoData && geoData.features.length > 0));
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 mb-6 shadow-sm">
       <div className="mb-3 text-sm font-semibold text-gray-800">選挙区マップ</div>
       {loading && <p className="text-xs text-gray-400">地図を読み込み中...</p>}
-      {!loading && location && (
+      {hasMapData && (
         <div className="h-[300px] rounded-md overflow-hidden">
-          <MapContent location={location} geoData={geoData} />
+          <MapContent
+            location={location ?? { lat: 35.681236, lng: 139.767125, displayName: municipality }}
+            geoData={geoData}
+          />
         </div>
       )}
-      {!loading && !location && (
+      {!loading && !hasMapData && (
         <p className="text-xs text-gray-400">この選挙区の地図データが見つかりませんでした</p>
       )}
     </div>
