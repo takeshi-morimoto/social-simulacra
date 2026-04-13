@@ -1,16 +1,22 @@
 /**
  * localStorageベースのシンプルなキャッシュ
  * 有効期限付き、キーのプレフィックスで名前空間を分離
+ *
+ * CACHE_VERSION を上げると古いバージョンのキャッシュは自動で無視される。
+ * バグ修正でキャッシュ内容が不正になった場合はここを上げる。
  */
 
 const DEFAULT_TTL_DAYS = 7;
+const CACHE_VERSION = 2; // v2: 地図geocode・policyKeyハッシュ・当選率修正
 
 export function cacheGet<T>(prefix: string, key: string): T | null {
   try {
     const raw = localStorage.getItem(`${prefix}:${key}`);
     if (!raw) return null;
-    const { data, expires } = JSON.parse(raw);
-    if (Date.now() > expires) {
+    const parsed = JSON.parse(raw);
+    const { data, expires, v } = parsed;
+    // バージョンが古い or 期限切れ → 削除して無視
+    if ((v ?? 0) < CACHE_VERSION || Date.now() > expires) {
       localStorage.removeItem(`${prefix}:${key}`);
       return null;
     }
@@ -36,19 +42,18 @@ export function cacheInvalidate(prefix: string, keyPrefix: string): void {
 }
 
 export function cacheSet<T>(prefix: string, key: string, data: T, ttlDays = DEFAULT_TTL_DAYS): void {
+  const payload = JSON.stringify({
+    data,
+    expires: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+    v: CACHE_VERSION,
+  });
   try {
-    localStorage.setItem(`${prefix}:${key}`, JSON.stringify({
-      data,
-      expires: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
-    }));
+    localStorage.setItem(`${prefix}:${key}`, payload);
   } catch {
     // localStorage full — 古いキャッシュを掃除して再試行
     cleanOldCache(prefix);
     try {
-      localStorage.setItem(`${prefix}:${key}`, JSON.stringify({
-        data,
-        expires: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
-      }));
+      localStorage.setItem(`${prefix}:${key}`, payload);
     } catch { /* give up */ }
   }
 }
