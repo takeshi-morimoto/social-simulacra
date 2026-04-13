@@ -138,20 +138,20 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
   const winRate = estimateWinRate(displayRate, personas?.length ?? 15, municipality);
 
   return (
-    <div className="mb-6" style={{ aspectRatio: "1200 / 630" }}>
+    <div className="mb-6 sm:aspect-[1200/630]">
       <div className="h-full rounded-xl border-2 border-gray-900 bg-gradient-to-br from-slate-50 via-white to-gray-100 shadow-lg relative overflow-hidden flex flex-col">
         <div className="absolute inset-[4px] border border-gray-300 rounded-lg pointer-events-none" />
         <BgIllustrations />
 
         {/* Top: Brand + Policy */}
-        <div className="px-6 pt-5 pb-3 relative">
-          <div className="flex items-baseline justify-between mb-2">
-            <span className="text-sm font-black tracking-[0.1em] text-[#1B2A4A]" style={{ fontFamily: "'Noto Serif JP', serif" }}>参謀AI</span>
-            <span className="text-[9px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-3">SANBO AI</span>
+        <div className="px-4 sm:px-6 pt-3 sm:pt-5 pb-2 sm:pb-3 relative">
+          <div className="flex items-baseline justify-between mb-1 sm:mb-2">
+            <span className="text-xs sm:text-sm font-black tracking-[0.1em] text-[#1B2A4A]" style={{ fontFamily: "'Noto Serif JP', serif" }}>参謀AI</span>
+            <span className="text-[8px] sm:text-[9px] tracking-[0.15em] text-gray-400 border-l border-gray-300 pl-2 sm:pl-3">SANBO AI</span>
           </div>
-          <div className="text-base font-bold text-gray-800 mb-0.5">{municipality}</div>
+          <div className="text-sm sm:text-base font-bold text-gray-800 mb-0.5">{municipality}</div>
           {policy && (
-            <div className="text-lg font-black text-gray-900 leading-7 line-clamp-2">「{policy}」</div>
+            <div className="text-base sm:text-lg font-black text-gray-900 leading-6 sm:leading-7 line-clamp-2">「{policy}」</div>
           )}
         </div>
 
@@ -159,38 +159,38 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
         {stanceCounts && total > 0 && analysis && (() => {
           const grade = getLetterGrade(winRate);
           return (
-            <div className="flex-1 flex flex-col justify-center px-6 relative">
-              <div className="flex items-center gap-4 mb-3">
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${grade.bg} border-2 ${grade.border} flex items-center justify-center shadow-md shrink-0`}>
-                  <span className="text-4xl font-black text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>{grade.letter}</span>
+            <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 relative">
+              <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-3">
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br ${grade.bg} border-2 ${grade.border} flex items-center justify-center shadow-md shrink-0`}>
+                  <span className="text-2xl sm:text-4xl font-black text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.25)" }}>{grade.letter}</span>
                 </div>
                 <div>
-                  <span className={`text-5xl font-black leading-none ${winRate >= 60 ? "text-green-600" : winRate >= 40 ? "text-amber-600" : "text-red-600"}`}>{winRate}%</span>
-                  <span className="text-xs text-gray-400 font-medium ml-1">当選率</span>
+                  <span className={`text-3xl sm:text-5xl font-black leading-none ${winRate >= 60 ? "text-green-600" : winRate >= 40 ? "text-amber-600" : "text-red-600"}`}>{winRate}%</span>
+                  <span className="text-[10px] sm:text-xs text-gray-400 font-medium ml-1">当選率</span>
                 </div>
-                <div className="border-l border-gray-300 pl-4">
-                  <span className="text-2xl font-black text-gray-700 leading-none">{displayRate}%</span>
-                  <span className="text-[10px] text-gray-400 ml-1">支持率</span>
+                <div className="border-l border-gray-300 pl-3 sm:pl-4">
+                  <span className="text-xl sm:text-2xl font-black text-gray-700 leading-none">{displayRate}%</span>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 ml-1">支持率</span>
                   {estimatedVotes !== null && (
-                    <span className="text-[10px] text-gray-400 ml-2">{estimatedVotes.toLocaleString()}票</span>
+                    <span className="text-[9px] sm:text-[10px] text-gray-400 ml-1 sm:ml-2">{estimatedVotes.toLocaleString()}票</span>
                   )}
                 </div>
               </div>
 
               {analysis.share_comment && (
-                <div className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 mb-3">
-                  <div className="text-sm font-bold text-white leading-6">💬 {analysis.share_comment}</div>
+                <div className="rounded-lg bg-[#1B2A4A] px-3 sm:px-4 py-2 sm:py-2.5 mb-2 sm:mb-3">
+                  <div className="text-xs sm:text-sm font-bold text-white leading-5 sm:leading-6">💬 {analysis.share_comment}</div>
                 </div>
               )}
 
-              <div className="flex h-3 overflow-hidden rounded-full mb-2">
+              <div className="flex h-2.5 sm:h-3 overflow-hidden rounded-full mb-1.5 sm:mb-2">
                 {STANCE_CONFIG.map(({ key, color }) =>
                   stanceCounts[key] > 0 ? (
                     <div key={key} style={{ width: `${(stanceCounts[key] / total) * 100}%`, backgroundColor: color }} />
                   ) : null
                 )}
               </div>
-              <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] mb-3">
+              <div className="flex flex-wrap gap-x-1.5 sm:gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] mb-2 sm:mb-3">
                 {STANCE_CONFIG.map(({ key, emoji, color }) =>
                   stanceCounts[key] > 0 ? (
                     <span key={key} className="font-semibold" style={{ color }}>{emoji}{key} {stanceCounts[key]}</span>
@@ -198,25 +198,25 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 {proOpinion && (
-                  <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-sm">👍</span>
-                      <span className="text-[10px] font-bold text-green-800">賛成の声</span>
+                  <div className="rounded-lg bg-green-50 border border-green-200 px-2 sm:px-3 py-1.5 sm:py-2">
+                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                      <span className="text-xs sm:text-sm">👍</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-green-800">賛成の声</span>
                     </div>
-                    <div className="text-[10px] text-green-900 leading-4 line-clamp-2">「{proOpinion.opinion}」</div>
-                    <div className="text-[9px] text-green-600 mt-0.5">— {proOpinion.persona.icon} {proOpinion.persona.name}（{proOpinion.persona.role}）</div>
+                    <div className="text-[9px] sm:text-[10px] text-green-900 leading-3.5 sm:leading-4 line-clamp-2">「{proOpinion.opinion}」</div>
+                    <div className="text-[8px] sm:text-[9px] text-green-600 mt-0.5">— {proOpinion.persona.icon} {proOpinion.persona.name}（{proOpinion.persona.role}）</div>
                   </div>
                 )}
                 {conOpinion && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="text-sm">👎</span>
-                      <span className="text-[10px] font-bold text-red-800">反対の声</span>
+                  <div className="rounded-lg bg-red-50 border border-red-200 px-2 sm:px-3 py-1.5 sm:py-2">
+                    <div className="flex items-center gap-1 mb-0.5 sm:mb-1">
+                      <span className="text-xs sm:text-sm">👎</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-red-800">反対の声</span>
                     </div>
-                    <div className="text-[10px] text-red-900 leading-4 line-clamp-2">「{conOpinion.opinion}」</div>
-                    <div className="text-[9px] text-red-600 mt-0.5">— {conOpinion.persona.icon} {conOpinion.persona.name}（{conOpinion.persona.role}）</div>
+                    <div className="text-[9px] sm:text-[10px] text-red-900 leading-3.5 sm:leading-4 line-clamp-2">「{conOpinion.opinion}」</div>
+                    <div className="text-[8px] sm:text-[9px] text-red-600 mt-0.5">— {conOpinion.persona.icon} {conOpinion.persona.name}（{conOpinion.persona.role}）</div>
                   </div>
                 )}
               </div>
@@ -225,9 +225,9 @@ export default function ShareCard({ municipality, policy, stanceCounts, analysis
         })()}
 
         {/* Bottom: CTA + Footer */}
-        <div className="flex items-center justify-between px-6 pb-3 pt-1 relative">
-          <span className="text-[10px] text-gray-500 bg-gray-100 rounded-full px-3 py-1">👉 あなたの選挙区でも試してみよう</span>
-          <span className="text-[9px] text-gray-400">Produced by KOIKOI, Inc.</span>
+        <div className="flex items-center justify-between px-4 sm:px-6 pb-2 sm:pb-3 pt-1 relative">
+          <span className="text-[9px] sm:text-[10px] text-gray-500 bg-gray-100 rounded-full px-2 sm:px-3 py-0.5 sm:py-1">👉 あなたの選挙区でも試してみよう</span>
+          <span className="text-[8px] sm:text-[9px] text-gray-400">Produced by KOIKOI, Inc.</span>
         </div>
       </div>
     </div>
