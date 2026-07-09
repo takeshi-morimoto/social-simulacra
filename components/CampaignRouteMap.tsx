@@ -109,46 +109,57 @@ export default function CampaignRouteMap({ municipality, spots, selectedSpotIds,
       })
       .catch(() => null);
 
+    // 外部GeoJSON(GitHub raw)は一時的な失敗があり得るため1回だけリトライする
+    const fetchJsonWithRetry = async (url: string): Promise<GeoJSON.FeatureCollection | null> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) return await res.json();
+        } catch {
+          // 次のattemptへ
+        }
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1000));
+      }
+      return null;
+    };
+
     let geoPromise: Promise<GeoJSON.FeatureCollection | null> = Promise.resolve(null);
 
     if (prefCode) {
       if (isShuugiin) {
-        geoPromise = fetch(`${SENKYOKU_BASE}/${prefCode}.json`)
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => {
-            if (!data || !districtNum) return data;
-            const filtered = {
-              ...data,
-              features: data.features.filter((f: GeoJSON.Feature) => f.properties?.ku === districtNum),
-            };
-            return filtered.features.length > 0 ? filtered : data;
-          })
-          .catch(() => null);
+        geoPromise = fetchJsonWithRetry(`${SENKYOKU_BASE}/${prefCode}.json`).then((data) => {
+          if (!data || !districtNum) return data;
+          const filtered = {
+            ...data,
+            features: data.features.filter((f: GeoJSON.Feature) => f.properties?.ku === districtNum),
+          };
+          return filtered.features.length > 0 ? filtered : data;
+        });
       } else {
-        geoPromise = fetch(`${MUNICIPALITY_BASE}/N03-21_${prefCode}_210101.json`)
-          .then((r) => r.ok ? r.json() : null)
-          .then((data) => {
-            if (!data) return null;
-            const targetName = searchQuery
-              .replace(/^(北海道|東京都|大阪府|京都府|.{2,3}県)/, "")
-              .replace(/(都|府|県)$/, "");
-            if (!targetName) return data;
-            const filtered = {
-              ...data,
-              features: data.features.filter((f: GeoJSON.Feature) => {
-                const props = f.properties || {};
-                const names = [props.N03_003, props.N03_004, props.N03_001].filter(Boolean).join("");
-                return names.includes(targetName);
-              }),
-            };
-            return filtered.features.length > 0 ? filtered : null;
-          })
-          .catch(() => null);
+        geoPromise = fetchJsonWithRetry(`${MUNICIPALITY_BASE}/N03-21_${prefCode}_210101.json`).then((data) => {
+          if (!data) return null;
+          const targetName = searchQuery
+            .replace(/^(北海道|東京都|大阪府|京都府|.{2,3}県)/, "")
+            .replace(/(都|府|県)$/, "");
+          if (!targetName) return data;
+          const filtered = {
+            ...data,
+            features: data.features.filter((f: GeoJSON.Feature) => {
+              const props = f.properties || {};
+              const names = [props.N03_003, props.N03_004, props.N03_001].filter(Boolean).join("");
+              return names.includes(targetName);
+            }),
+          };
+          return filtered.features.length > 0 ? filtered : null;
+        });
       }
     }
 
     Promise.all([geocodePromise, geoPromise])
       .then(([loc, geo]) => {
+        if (prefCode && (!geo || geo.features.length === 0)) {
+          console.error("CampaignRouteMap: 境界データの取得/絞り込みに失敗しました", { municipality, prefCode });
+        }
         setLocation(loc);
         setGeoData(geo);
       })
