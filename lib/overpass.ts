@@ -74,7 +74,12 @@ out center bb;
   try {
     const res = await fetch(OVERPASS_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        // Overpass APIはUser-Agent未指定のリクエストを406で拒否するため必須
+        "User-Agent": "SANBO-AI/1.0 (+https://sanbo-ai.vercel.app)",
+        "Accept": "*/*",
+      },
       body: `data=${encodeURIComponent(query)}`,
     });
 
