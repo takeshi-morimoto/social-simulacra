@@ -423,17 +423,17 @@ export default function Home() {
   const originalToggleSection = toggleSection;
   const handleToggleSection = useCallback((key: "analysis" | "policy" | "route") => {
     originalToggleSection(key);
-    if (key === "route" && !openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading) {
+    if (key === "route" && !openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading && !spotsError) {
       fetchSpots();
     }
-  }, [originalToggleSection, openSections.route, municipality, rawSpots.length, spotsLoading, fetchSpots]);
+  }, [originalToggleSection, openSections.route, municipality, rawSpots.length, spotsLoading, spotsError, fetchSpots]);
 
   // 遊説プランセクションが開いているのにスポットがない場合に取得
   useEffect(() => {
-    if (openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading) {
+    if (openSections.route && municipality.trim() && rawSpots.length === 0 && !spotsLoading && !spotsError) {
       fetchSpots();
     }
-  }, [openSections.route, municipality, rawSpots.length, spotsLoading, fetchSpots]);
+  }, [openSections.route, municipality, rawSpots.length, spotsLoading, spotsError, fetchSpots]);
 
   const toggleSpot = useCallback((spotId: string) => {
     setSelectedIds((prev) => {
